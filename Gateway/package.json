@@ -1,0 +1,1 @@
+{"name":"nro-two-tab-web-gateway","version":"1.0.0","private":true,"scripts":{"start":"node server.cjs","test":"node --test *.test.cjs ../Tests/*.test.cjs"},"dependencies":{"ws":"8.21.3"},"devDependencies":{"@playwright/test":"^1.64.0"}}

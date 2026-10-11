@@ -1,0 +1,7 @@
+# Preserve binary client resources and protocol fixtures byte-for-byte.
+Assets/Resources/** -text
+Tests/Fixtures/** binary
+*.wasm binary
+*.data binary
+*.png binary
+*.zip binary
