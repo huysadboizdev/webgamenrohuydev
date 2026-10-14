@@ -37,6 +37,10 @@ public static class PcClientBuild
     {
         var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath);
         if (icon == null) throw new Exception("Missing app icon at " + IconPath);
-        PlayerSettings.SetIconsForTargetGroup(group, new[] { icon });
+        if (icon.width < 128 || icon.height < 128) throw new Exception("App icon too small: " + icon.width + "x" + icon.height);
+        PlayerSettings.SetIconsForTargetGroup(group, Enumerable.Repeat(icon, 8).ToArray());
+        var applied = PlayerSettings.GetIconsForTargetGroup(group);
+        if (applied == null || applied.Length == 0 || applied[0] == null)
+            throw new Exception("App icon was not accepted for " + group + "; aborting instead of shipping the default Unity icon.");
     }
 }
