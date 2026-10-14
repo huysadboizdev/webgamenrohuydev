@@ -23,6 +23,9 @@ public static class ApkClientBuild
             ? Path.Combine(Application.dataPath, "../Builds/APK/NROBEAR.apk") : configured);
         PlayerSettings.productName = ProductName;
         PlayerSettings.SetApplicationIdentifier(BuildTargetGroup.Android, BundleId);
+        PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel23;
+        PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel34;
+        PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARMv7 | AndroidArchitecture.ARM64;
         PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
         PcClientBuild.SetAppIcon(BuildTargetGroup.Android);
         Directory.CreateDirectory(Path.GetDirectoryName(output));
