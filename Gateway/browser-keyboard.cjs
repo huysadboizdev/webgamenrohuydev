@@ -11,7 +11,7 @@ const bridge=html.slice(html.indexOf('  var keyboard ='),html.indexOf("  documen
    const page=await browser.newPage({viewport:{width:844,height:390},isMobile:true,hasTouch:true,userAgent:name==='iOS'?'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile Safari/604.1':'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/128.0.0.0 Mobile Safari/537.36'});
    await page.setContent(markup+'<script>var canvas=document.getElementById("unity-canvas");'+bridge+'</script>');
    expect(await page.evaluate(()=>document.getElementById('game').contains(document.getElementById('keyboard'))),'Keyboard must belong to the fullscreen game element').toBe(true);
-   await page.evaluate(()=>document.getElementById('fullscreen').onclick=()=>document.getElementById('game').requestFullscreen());
+   await page.evaluate(()=>{const button=document.createElement('button');button.id='fullscreen';button.textContent='Test fullscreen';button.onclick=()=>document.getElementById('game').requestFullscreen();document.getElementById('game').appendChild(button);});
    await page.locator('#fullscreen').tap();
    await expect.poll(()=>page.evaluate(()=>document.fullscreenElement&&document.fullscreenElement.id)).toBe('game');
    // A deferred Unity callback has no trusted gesture. Reopen must provide one.

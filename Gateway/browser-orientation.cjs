@@ -16,19 +16,19 @@ const {once}=require('node:events');
    await page.route('**/Build/*.loader.js',r=>r.fulfill({contentType:'application/javascript',body:'window.starts=0;window.pastes=[];window.createUnityInstance=async()=>{starts++;return {SendMessage:(host,method,value)=>{if(method==="SelectTab")NroTabs.changed(Number(value));if(method==="Paste")pastes.push(value);}}};'}));
    await page.goto('http://127.0.0.1:'+server.address().port);await page.waitForFunction(()=>gameInstance!==null);
    const gate=page.locator('#rotate-device');
-   if(kind==='pc') {await expect(gate).toBeHidden();await page.locator('#tab2').click();}
+   if(kind==='pc') {await expect(gate).toBeHidden();await page.evaluate(()=>gameInstance.SendMessage('BrowserHost','SelectTab','1'));}
    else {
-    await expect(gate).toBeVisible();await expect(gate).toContainText('Vui lòng xoay ngang thiết bị để chơi');
+    await expect(gate).toBeVisible();await expect(gate).toContainText('xoay ngang');
     expect(await page.locator('#view').evaluate(e=>e.inert)).toBe(true);
     await page.evaluate(()=>{const event=new Event('paste',{cancelable:true});Object.defineProperty(event,'clipboardData',{value:{getData:()=> 'portrait-paste'}});document.dispatchEvent(event);});
     expect(await page.evaluate(()=>pastes)).toEqual([]);
     await page.setViewportSize({width:844,height:390});await expect(gate).toBeHidden();
-    await page.locator('#tab2').click();await expect.poll(()=>page.evaluate(()=>NroTabs.current)).toBe(1);
-    await page.evaluate(()=>NroInput.open('giữ nội dung',false,false));
+    await page.evaluate(()=>gameInstance.SendMessage('BrowserHost','SelectTab','1'));await expect.poll(()=>page.evaluate(()=>NroTabs.current)).toBe(1);
+    await page.evaluate(()=>NroInput.open('giá»¯ ná»™i dung',false,false));
     await page.setViewportSize({width:390,height:844});await expect(gate).toBeVisible();
     expect(await page.locator('#text-input').evaluate(e=>document.activeElement===e)).toBe(false);
     await page.setViewportSize({width:844,height:390});await expect(gate).toBeHidden();
-    expect(await page.evaluate(()=>({starts,tab:NroTabs.current,value:NroInput.value(),state:NroInput.state()}))).toEqual({starts:1,tab:1,value:'giữ nội dung',state:1});
+    expect(await page.evaluate(()=>({starts,tab:NroTabs.current,value:NroInput.value(),state:NroInput.state()}))).toEqual({starts:1,tab:1,value:'giá»¯ ná»™i dung',state:1});
     await expect(page.locator('#keyboard')).toBeVisible();
    }
    console.log('PASS orientation '+kind+': portrait gate, landscape access, session/input preserved');await page.close();

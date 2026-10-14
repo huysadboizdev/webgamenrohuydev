@@ -92,7 +92,8 @@ for tab in ('Game1', 'Game2'):
     p=d/'CrackBallScr.cs';s=p.read_text(encoding='utf-8-sig')
     _,_,body=block(s,'public void AutoCrackBall()')
     # BrowserHost.Guard handles exceptions outside iterator MoveNext.
-    body=body[body.index('while (isAutoCrackBall'):body.rindex('catch (Exception)')]
+    locals_body = body[:body.index('try')].strip()
+    body=locals_body + '\n' + body[body.index('while (isAutoCrackBall'):body.rindex('catch (Exception)')]
     body=body[:body.rfind('}')]
     body=body.replace('Thread.ResetAbort();','')
     body=body.replace('while (num < 7 && step != 5)','while (num < 7 && step != 5 && isAutoCrackBall)')

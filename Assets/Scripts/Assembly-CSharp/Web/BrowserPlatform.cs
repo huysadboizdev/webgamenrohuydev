@@ -41,7 +41,11 @@ namespace NroWeb
 #endif
             }
         }
-        public static void OpenInput(string text, bool password, bool numeric) {
+        private static int inputOwner;
+        public static bool HasFieldInput { get { return inputOwner == 1; } }
+        public static bool HasCommandInput { get { return inputOwner == 2; } }
+        public static void OpenInput(string text, bool password, bool numeric, bool field = true) {
+            inputOwner = field ? 1 : 2;
 #if UNITY_WEBGL && !UNITY_EDITOR
             NroInputOpen(text, password ? 1 : 0, numeric ? 1 : 0);
 #endif
@@ -70,6 +74,7 @@ namespace NroWeb
 #endif
         }
         public static void CloseInput() {
+            inputOwner = 0;
 #if UNITY_WEBGL && !UNITY_EDITOR
             NroInputClose();
 #endif

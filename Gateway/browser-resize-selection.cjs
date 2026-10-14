@@ -12,11 +12,11 @@ const {createGateway}=require('./server.cjs');
    const logs=[],errors=[];page.on('console',m=>logs.push(m.text()));page.on('pageerror',e=>errors.push(String(e)));
    await page.route('**/config.js',route=>route.fulfill({contentType:'application/javascript',body:"window.NRO_WEB_CONFIG={serverList:'Fixture:"+target+":0,0,0'};"}));
    await page.goto('http://127.0.0.1:'+server.address().port);await page.waitForFunction(()=>gameInstance!==null,{},{timeout:180000});
-   await page.locator('#tab2').click();await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game2'))).toBe(true);
+   await page.evaluate(()=>gameInstance.SendMessage('BrowserHost','SelectTab','1'));await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game2'))).toBe(true);
    await page.setViewportSize(mobile?{width:320,height:568}:{width:640,height:480});
    if(mobile){await expect(page.locator('#rotate-device')).toBeVisible();await page.setViewportSize({width:568,height:320});await expect(page.locator('#rotate-device')).toBeHidden();}
    for(const tab of [1,2]){
-    await page.locator('#tab'+tab).click();const before=handshakes;
+    await page.evaluate(index=>gameInstance.SendMessage('BrowserHost','SelectTab',String(index)),tab-1);const before=handshakes;
     await expect.poll(async()=>{const box=await page.locator('#unity-canvas').boundingBox();if(mobile)await page.touchscreen.tap(box.x+box.width/2,box.y+box.height/2);else await page.mouse.click(box.x+box.width/2,box.y+box.height/2,{delay:120});return handshakes;},{timeout:30000,intervals:[1000,2000]}).toBeGreaterThan(before);
    }
    expect(errors).toEqual([]);expect(logs.filter(s=>/Exception:|RuntimeError:/.test(s))).toEqual([]);

@@ -419,7 +419,6 @@ namespace Game2
 
 		public void analogToolOption()
 		{
-            if (NroWeb.BrowserPlatform.IsBrowser && GameScr.gamePad != null) GameScr.gamePad.release();
 			if (GameScr.isAnalog == 0)
 			{
 				GameScr.isAnalog = 1;
@@ -437,7 +436,7 @@ namespace Game2
 
 		public void CaseAnalog()
 		{
-			if (NroWeb.BrowserPlatform.IsBrowser || !Main.isPC || Main.isIPhone)
+			if (!Main.isPC || Main.isIPhone)
 			{
 				if (!GameCanvas.isTouch)
 				{

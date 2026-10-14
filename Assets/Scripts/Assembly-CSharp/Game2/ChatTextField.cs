@@ -185,8 +185,6 @@ namespace Game2
 
 		public void startChat(IChatable parentScreen, string to)
 		{
-            tfChat.cmdDoneAction = NroWeb.BrowserPlatform.IsBrowser
-                ? new Command { action = delegate { cmdChat.perform(tfChat.getText()); } } : left;
 			right.caption = mResources.CLOSE;
 			this.to = to;
 			if (Main.isWindowsPhone)
@@ -203,8 +201,7 @@ namespace Game2
 				tfChat.isFocus = true;
 				if (!Main.isPC)
 				{
-					if (!NroWeb.BrowserPlatform.IsBrowser)
-						ipKeyboard.openKeyBoard(strChat, ipKeyboard.TEXT, string.Empty, cmdChat);
+					ipKeyboard.openKeyBoard(strChat, ipKeyboard.TEXT, string.Empty, cmdChat);
 					tfChat.setFocusWithKb(isFocus: true);
 				}
 			}
@@ -215,8 +212,6 @@ namespace Game2
 
 		public void startChat2(IChatable parentScreen, string to)
 		{
-            tfChat.cmdDoneAction = NroWeb.BrowserPlatform.IsBrowser
-                ? new Command { action = delegate { cmdChat2.perform(tfChat.getText()); } } : left;
 			tfChat.setFocusWithKb(isFocus: true);
 			this.to = to;
 			this.parentScreen = parentScreen;
@@ -233,8 +228,7 @@ namespace Game2
 				isShow = true;
 				if (!Main.isPC)
 				{
-					if (!NroWeb.BrowserPlatform.IsBrowser)
-						ipKeyboard.openKeyBoard(strChat, ipKeyboard.TEXT, string.Empty, cmdChat2);
+					ipKeyboard.openKeyBoard(strChat, ipKeyboard.TEXT, string.Empty, cmdChat2);
 					tfChat.setFocusWithKb(isFocus: true);
 				}
 			}

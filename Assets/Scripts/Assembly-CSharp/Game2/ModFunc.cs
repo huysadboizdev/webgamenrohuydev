@@ -673,6 +673,7 @@ namespace Game2
 
 		public void AutoAttack()
 		{
+            if (PickMob.tanSat || PickMob.tsPlayer) return;
 			Char @char = Char.myCharz();
 			if (!Char.isLoadingMap && !@char.stone && !@char.meDead && @char.statusMe != 14 && @char.statusMe != 5 && @char.myskill.template.type == 1 && @char.myskill.template.id != 10 && @char.myskill.template.id != 11 && !@char.myskill.paintCanNotUseSkill && mSystem.currentTimeMillis() - lastAutoAttack > 500)
 			{

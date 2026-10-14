@@ -18,3 +18,10 @@ __pycache__/
 .env.*
 Tests/evidence/*
 !Tests/evidence/.gitkeep
+
+# Keep the active web build; exclude local release backups and staging.
+/Builds/*
+!/Builds/WebGL/
+.DS_Store.meta
+.vs.meta
+/validation-shell/

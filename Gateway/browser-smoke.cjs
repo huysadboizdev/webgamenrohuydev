@@ -23,9 +23,9 @@ const {createGateway} = require('./server.cjs');
       await page.waitForFunction(()=>document.getElementById('status').style.display==='none',{},{timeout:180000});
       const expected='pc='+(!mobile?'True':'False')+' mobile='+(mobile?'True':'False');
       await require('@playwright/test').expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game1 '+expected)),{timeout:30000}).toBe(true);
-      await page.getByRole('button',{name:'Tài khoản 2',exact:true}).click();
+      await page.evaluate(()=>gameInstance.SendMessage('BrowserHost','SelectTab','1'));
       await require('@playwright/test').expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game2 '+expected)),{timeout:30000}).toBe(true);
-      await page.getByRole('button',{name:'Tài khoản 1',exact:true}).click();
+      await page.evaluate(()=>gameInstance.SendMessage('BrowserHost','SelectTab','0'));
       if(mobile){
         await page.evaluate(()=>NroInput.open('test',false,false));
         await page.locator('#text-input').fill('');

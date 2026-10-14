@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Game2
 {
@@ -24,10 +24,9 @@ namespace Game2
 
 		public ImageInfo getImageInfo(sbyte id)
 		{
-			if (imgInfo == null) return null;
-            for (int i = 0; i < imgInfo.Length; i++)
+			for (int i = 0; i < imgInfo.Length; i++)
 			{
-				if (imgInfo[i].ID == (id & 255))
+				if (imgInfo[i].ID == id)
 				{
 					return imgInfo[i];
 				}
@@ -42,7 +41,7 @@ namespace Game2
 
 		public short[] get(int index)
 		{
-			if (index < 0 || index >= anim_data.Length)
+			if (index >= anim_data.Length)
 			{
 				index = 0;
 			}
@@ -64,7 +63,7 @@ namespace Game2
 			{
 				return;
 			}
-			if (dataInputStream != null) readData(dataInputStream.r);
+			readData(dataInputStream.r);
 		}
 
 		public void readData2(string patch)
@@ -78,82 +77,186 @@ namespace Game2
 			{
 				return;
 			}
-			if (dataInputStream != null) readEffect(dataInputStream.r);
+			readEffect(dataInputStream.r);
 		}
 
 		public void readEffect(myReader msg)
 		{
-            ReadCheckedEffect(msg, false);
+			int num = 0;
+			int num2 = 0;
+			int num3 = 0;
+			int num4 = 0;
+			try
+			{
+				sbyte b = msg.readByte();
+				Res.outz("size IMG==========" + b);
+				imgInfo = new ImageInfo[b];
+				for (int i = 0; i < b; i++)
+				{
+					imgInfo[i] = new ImageInfo();
+					imgInfo[i].ID = msg.readByte();
+					imgInfo[i].x0 = msg.readUnsignedByte();
+					imgInfo[i].y0 = msg.readUnsignedByte();
+					imgInfo[i].w = msg.readUnsignedByte();
+					imgInfo[i].h = msg.readUnsignedByte();
+				}
+				short num5 = msg.readShort();
+				frame = new Frame[num5];
+				for (int j = 0; j < frame.Length; j++)
+				{
+					frame[j] = new Frame();
+					sbyte b2 = msg.readByte();
+					frame[j].dx = new short[b2];
+					frame[j].dy = new short[b2];
+					frame[j].idImg = new sbyte[b2];
+					for (int k = 0; k < b2; k++)
+					{
+						frame[j].dx[k] = msg.readShort();
+						frame[j].dy[k] = msg.readShort();
+						frame[j].idImg[k] = msg.readByte();
+						if (j == 0)
+						{
+							if (num > frame[j].dx[k])
+							{
+								num = frame[j].dx[k];
+							}
+							if (num2 > frame[j].dy[k])
+							{
+								num2 = frame[j].dy[k];
+							}
+							if (num3 < frame[j].dx[k] + imgInfo[frame[j].idImg[k]].w)
+							{
+								num3 = frame[j].dx[k] + imgInfo[frame[j].idImg[k]].w;
+							}
+							if (num4 < frame[j].dy[k] + imgInfo[frame[j].idImg[k]].h)
+							{
+								num4 = frame[j].dy[k] + imgInfo[frame[j].idImg[k]].h;
+							}
+							width = num3 - num;
+							height = num4 - num2;
+						}
+					}
+				}
+				arrFrame = new short[msg.readShort()];
+				for (int l = 0; l < arrFrame.Length; l++)
+				{
+					arrFrame[l] = msg.readShort();
+				}
+			}
+			catch (Exception ex)
+			{
+				ex.StackTrace.ToString();
+				Res.outz("1");
+			}
 		}
 
 		public void readData(myReader iss)
 		{
-            ReadCheckedEffect(iss, false);
+			int num = 0;
+			int num2 = 0;
+			int num3 = 0;
+			int num4 = 0;
+			try
+			{
+				sbyte b = iss.readByte();
+				imgInfo = new ImageInfo[b];
+				for (int i = 0; i < b; i++)
+				{
+					imgInfo[i] = new ImageInfo();
+					imgInfo[i].ID = iss.readByte();
+					imgInfo[i].x0 = iss.readUnsignedByte();
+					imgInfo[i].y0 = iss.readUnsignedByte();
+					imgInfo[i].w = iss.readUnsignedByte();
+					imgInfo[i].h = iss.readUnsignedByte();
+				}
+				short num5 = iss.readShort();
+				frame = new Frame[num5];
+				for (int j = 0; j < num5; j++)
+				{
+					frame[j] = new Frame();
+					sbyte b2 = iss.readByte();
+					frame[j].dx = new short[b2];
+					frame[j].dy = new short[b2];
+					frame[j].idImg = new sbyte[b2];
+					for (int k = 0; k < b2; k++)
+					{
+						frame[j].dx[k] = iss.readShort();
+						frame[j].dy[k] = iss.readShort();
+						frame[j].idImg[k] = iss.readByte();
+						if (j == 0)
+						{
+							if (num > frame[j].dx[k])
+							{
+								num = frame[j].dx[k];
+							}
+							if (num2 > frame[j].dy[k])
+							{
+								num2 = frame[j].dy[k];
+							}
+							if (num3 < frame[j].dx[k] + imgInfo[frame[j].idImg[k]].w)
+							{
+								num3 = frame[j].dx[k] + imgInfo[frame[j].idImg[k]].w;
+							}
+							if (num4 < frame[j].dy[k] + imgInfo[frame[j].idImg[k]].h)
+							{
+								num4 = frame[j].dy[k] + imgInfo[frame[j].idImg[k]].h;
+							}
+							width = num3 - num;
+							height = num4 - num2;
+						}
+					}
+				}
+				short num6 = iss.readShort();
+				arrFrame = new short[num6];
+				if (ID >= 201)
+				{
+					short num7 = 0;
+					short[] array = new short[num6];
+					int num8 = 0;
+					string text = string.Empty;
+					bool flag = false;
+					for (int l = 0; l < num6; l++)
+					{
+						short num9 = iss.readShort();
+						text = text + num9 + ",";
+						arrFrame[l] = num9;
+						if (num9 + 500 >= 500)
+						{
+							array[num8++] = num9;
+							flag = true;
+							continue;
+						}
+						num7 = (short)Res.abs(num9 + 500);
+						anim_data[num7] = new short[num8];
+						Array.Copy(array, 0, anim_data[num7], 0, num8);
+						num8 = 0;
+					}
+					if (!flag)
+					{
+						anim_data[0] = new short[num8];
+						Array.Copy(array, 0, anim_data[num7], 0, num8);
+						return;
+					}
+					for (int m = 0; m < 16; m++)
+					{
+						if (anim_data[m] == null)
+						{
+							anim_data[m] = anim_data[2];
+						}
+					}
+				}
+				else
+				{
+					for (int n = 0; n < num6; n++)
+					{
+						arrFrame[n] = iss.readShort();
+					}
+				}
+			}
+			catch (Exception)
+			{
+			}
 		}
-
-        // Parse into temporary arrays: malformed packets must never replace a working effect.
-        private sealed class EffectReader
-        {
-            readonly sbyte[] bytes; int position;
-            public EffectReader(sbyte[] data) { bytes = data; }
-            public int Remaining { get { return bytes.Length - position; } }
-            public int Byte() { if (Remaining < 1) throw new System.IO.InvalidDataException("Truncated effect"); return bytes[position++] & 255; }
-            public short Short() { if (Remaining < 2) throw new System.IO.InvalidDataException("Truncated effect"); return (short)((Byte() << 8) | Byte()); }
-            public int Count(int minimumBytes) { int n = Short(); if (n < 0 || n > Remaining / minimumBytes) throw new System.IO.InvalidDataException("Invalid effect count"); return n; }
-        }
-        private bool TryReadEffect(sbyte[] bytes, bool wide)
-        {
-            if (bytes == null || bytes.Length == 0) return false;
-            try {
-                var r = new EffectReader(bytes);
-                int count = r.Byte();
-                if (count == 0 || count > 127 || count > r.Remaining / (wide ? 7 : 5)) return false;
-                var images = new ImageInfo[count];
-                for (int i = 0; i < count; i++) {
-                    images[i] = new ImageInfo { ID = r.Byte(), x0 = wide ? r.Short() : r.Byte(), y0 = wide ? r.Short() : r.Byte(), w = r.Byte(), h = r.Byte() };
-                    if (images[i].x0 < 0 || images[i].y0 < 0 || images[i].w <= 0 || images[i].h <= 0) return false;
-                }
-                int frameCount = r.Count(1);
-                if (frameCount == 0) return false;
-                var frames = new Frame[frameCount];
-                int left = 0, top = 0, right = 0, bottom = 0;
-                for (int j = 0; j < frameCount; j++) {
-                    int parts = r.Byte(); if (parts > 127 || parts > r.Remaining / 5) return false;
-                    var f = new Frame { dx = new short[parts], dy = new short[parts], idImg = new sbyte[parts] };
-                    frames[j] = f;
-                    for (int k = 0; k < parts; k++) {
-                        f.dx[k] = r.Short(); f.dy[k] = r.Short(); int sprite = r.Byte(); f.idImg[k] = unchecked((sbyte)sprite);
-                        ImageInfo info = null;
-                        for (int i = 0; i < count; i++) if (images[i].ID == sprite) { info = images[i]; break; }
-                        if (info == null) return false;
-                        if (j == 0) { left = System.Math.Min(left, f.dx[k]); top = System.Math.Min(top, f.dy[k]); right = System.Math.Max(right, f.dx[k] + info.w); bottom = System.Math.Max(bottom, f.dy[k] + info.h); }
-                    }
-                }
-                int sequenceCount = r.Count(2);
-                var sequence = new short[sequenceCount]; var animations = new short[16][];
-                var segment = new System.Collections.Generic.List<short>(); bool markers = false;
-                for (int i = 0; i < sequenceCount; i++) {
-                    short value = r.Short(); sequence[i] = value;
-                    if (ID >= 201 && value < -500) {
-                        int index = -(value + 500); if (index < 0 || index >= animations.Length) return false;
-                        animations[index] = segment.ToArray(); segment.Clear(); markers = true;
-                    } else { if (value < 0 || value >= frameCount) return false; segment.Add(value); }
-                }
-                // Legacy assets include optional exporter trailers after the declared sequence.
-                if (!markers) animations[0] = segment.ToArray();
-                else if (segment.Count > 0) animations[0] = segment.ToArray();
-                short[] fallback = animations[2] ?? animations[0] ?? new short[1];
-                for (int i = 0; i < animations.Length; i++) if (animations[i] == null) animations[i] = fallback;
-                imgInfo = images; frame = frames; arrFrame = sequence; anim_data = animations;
-                width = right - left; height = bottom - top; return true;
-            } catch (System.IO.InvalidDataException) { return false; }
-        }
-        private void ReadCheckedEffect(myReader source, bool wideFirst)
-        {
-            if (source == null || source.buffer == null) return;
-            var bytes = new sbyte[source.available()]; source.read(ref bytes, 0, bytes.Length);
-            if (!TryReadEffect(bytes, wideFirst)) TryReadEffect(bytes, !wideFirst);
-        }
 
 		public void readData(sbyte[] data)
 		{
@@ -169,7 +272,7 @@ namespace Game2
 
 		public void paintFrame(mGraphics g, int f, int x, int y, int trans, int layer)
 		{
-			if (this.frame == null || f < 0 || f >= this.frame.Length || img == null)
+			if (this.frame == null || this.frame.Length == 0)
 			{
 				return;
 			}
@@ -177,7 +280,6 @@ namespace Game2
 			for (int i = 0; i < frame.dx.Length; i++)
 			{
 				ImageInfo imageInfo = getImageInfo(frame.idImg[i]);
-                if (imageInfo == null) continue;
 				try
 				{
 					switch (trans)
@@ -204,7 +306,77 @@ namespace Game2
 
 		public void readMobNew(myReader msg, sbyte typeread)
 		{
-            ReadCheckedEffect(msg, typeread != 1);
+			int num = 0;
+			int num2 = 0;
+			int num3 = 0;
+			int num4 = 0;
+			try
+			{
+				sbyte b = msg.readByte();
+				imgInfo = new ImageInfo[b];
+				for (int i = 0; i < b; i++)
+				{
+					imgInfo[i] = new ImageInfo();
+					imgInfo[i].ID = msg.readByte();
+					if (typeread == 1)
+					{
+						imgInfo[i].x0 = msg.readUnsignedByte();
+						imgInfo[i].y0 = msg.readUnsignedByte();
+					}
+					else
+					{
+						imgInfo[i].x0 = msg.readShort();
+						imgInfo[i].y0 = msg.readShort();
+					}
+					imgInfo[i].w = msg.readUnsignedByte();
+					imgInfo[i].h = msg.readUnsignedByte();
+				}
+				short num5 = msg.readShort();
+				frame = new Frame[num5];
+				for (int j = 0; j < frame.Length; j++)
+				{
+					frame[j] = new Frame();
+					sbyte b2 = msg.readByte();
+					frame[j].dx = new short[b2];
+					frame[j].dy = new short[b2];
+					frame[j].idImg = new sbyte[b2];
+					for (int k = 0; k < b2; k++)
+					{
+						frame[j].dx[k] = msg.readShort();
+						frame[j].dy[k] = msg.readShort();
+						frame[j].idImg[k] = msg.readByte();
+						if (j == 0)
+						{
+							if (num > frame[j].dx[k])
+							{
+								num = frame[j].dx[k];
+							}
+							if (num2 > frame[j].dy[k])
+							{
+								num2 = frame[j].dy[k];
+							}
+							if (num3 < frame[j].dx[k] + imgInfo[frame[j].idImg[k]].w)
+							{
+								num3 = frame[j].dx[k] + imgInfo[frame[j].idImg[k]].w;
+							}
+							if (num4 < frame[j].dy[k] + imgInfo[frame[j].idImg[k]].h)
+							{
+								num4 = frame[j].dy[k] + imgInfo[frame[j].idImg[k]].h;
+							}
+							width = num3 - num;
+							height = num4 - num2;
+						}
+					}
+				}
+				arrFrame = new short[msg.readShort()];
+				for (int l = 0; l < arrFrame.Length; l++)
+				{
+					arrFrame[l] = msg.readShort();
+				}
+			}
+			catch (Exception)
+			{
+			}
 		}
 	}
 }

@@ -14,7 +14,7 @@ const {once}=require('node:events');const fs=require('node:fs');
   await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game1')),{timeout:30000}).toBe(true);
   const cdp=await page.context().newCDPSession(page);await cdp.send('Performance.enable');
   for(const [width,height,tab] of [[1920,1080,1],[1920,1080,2],[1280,800,2]]){
-   await page.setViewportSize({width,height});await page.locator('#tab'+tab).click();
+   await page.setViewportSize({width,height});await page.evaluate(index=>gameInstance.SendMessage('BrowserHost','SelectTab',String(index)),tab-1);
    await page.evaluate(()=>new Promise(r=>{let n=90;function next(){if(--n)requestAnimationFrame(next);else r();}requestAnimationFrame(next);}));
    const before=await cdp.send('Performance.getMetrics');
    const timing=await page.evaluate(()=>new Promise(resolve=>{const frames=[];let last=performance.now(),drawLast=window.draws;function next(now){frames.push({ms:now-last,draws:window.draws-drawLast});last=now;drawLast=window.draws;if(frames.length===180)resolve({frames,canvas:{width:document.querySelector('canvas').width,height:document.querySelector('canvas').height}});else requestAnimationFrame(next);}requestAnimationFrame(next);}));

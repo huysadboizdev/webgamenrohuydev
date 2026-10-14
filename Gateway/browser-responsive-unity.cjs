@@ -22,13 +22,13 @@ const {once}=require('node:events'),fs=require('node:fs'),path=require('node:pat
    const flags='pc='+(mobile?'False':'True')+' mobile='+(mobile?'True':'False');
    await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game1 '+flags)),{timeout:30000}).toBe(true);
    if(mobile)await page.setViewportSize({width:844,height:390});
-   await page.locator('#tab2').click();await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game2 '+flags))).toBe(true);
+   await page.evaluate(()=>gameInstance.SendMessage('BrowserHost','SelectTab','1'));await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game2 '+flags))).toBe(true);
    for(const [width,height] of sizes){
     await page.setViewportSize({width,height});
     if(mobile&&height>width){await expect(page.locator('#rotate-device')).toBeVisible();await page.screenshot({path:path.join(output,'responsive-'+name+'-'+width+'x'+height+'-rotate.png')});results.push({name,width,height,mobile,rotationRequired:true});continue;}
     await expect(page.locator('#rotate-device')).toBeHidden();
     for(const tab of [1,2]){
-     await page.locator('#tab'+tab).click();
+     await page.evaluate(index=>gameInstance.SendMessage('BrowserHost','SelectTab',String(index)),tab-1);
      await expect.poll(()=>page.evaluate(()=>NroTabs.current)).toBe(tab-1);
      await page.evaluate(()=>new Promise(resolve=>{let n=20;function frame(){if(--n<=0)resolve();else requestAnimationFrame(frame);}requestAnimationFrame(frame);}));
      const geometry=await page.locator('#unity-canvas').evaluate(c=>{const r=c.getBoundingClientRect();return {w:c.width,h:c.height,x:r.x,y:r.y,displayW:r.width,displayH:r.height,right:r.right,bottom:r.bottom};});

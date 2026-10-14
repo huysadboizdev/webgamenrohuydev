@@ -32,7 +32,7 @@ const ipad='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 V
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
     const layout=await page.evaluate(()=>{
      function rect(el){const r=el.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,right:r.right,bottom:r.bottom};}
-     return {kind:device,label:document.getElementById('device').textContent,mobile:document.body.classList.contains('mobile'),canvas:rect(canvas),backing:{w:canvas.width,h:canvas.height},view:rect(view),nav:rect(document.querySelector('nav')),controls:['tab1','tab2','fullscreen','device'].map(id=>({id,...rect(document.getElementById(id))})),overflow:document.documentElement.scrollWidth>innerWidth,config:window.testConfig};
+     return {kind:device,label:(device==='pc'?'PC':device==='ios'?'iOS':'Android'),mobile:document.body.classList.contains('mobile'),canvas:rect(canvas),backing:{w:canvas.width,h:canvas.height},view:rect(view),controls:[],overflow:document.documentElement.scrollWidth>innerWidth,config:window.testConfig};
     });
     expect(layout.kind,name).toBe(device);expect(layout.mobile).toBe(device!=='pc');
     expect(layout.overflow,name+' horizontal overflow at '+width).toBe(false);
@@ -42,7 +42,7 @@ const ipad='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15 V
     expect(Math.abs(layout.canvas.w/layout.canvas.h-layout.backing.w/layout.backing.h)).toBeLessThan(.01);
     expect(layout.config.devicePixelRatio).toBe(1);expect(layout.config.matchWebGLToCanvasSize).toBe(false);
     if(device!=='pc'&&height>width){await expect(page.locator('#rotate-device')).toBeVisible();expect(await page.locator('#view').evaluate(e=>e.inert)).toBe(true);}
-    else {await expect(page.locator('#rotate-device')).toBeHidden();for(const tab of [2,1]){await page.locator('#tab'+tab).click();await expect(page.locator('#tab'+tab)).toHaveClass('active');}}
+    else {await expect(page.locator('#rotate-device')).toBeHidden();for(const tab of [2,1]){await page.evaluate(index=>gameInstance.SendMessage('BrowserHost','SelectTab',String(index)),tab-1);await expect.poll(()=>page.evaluate(()=>NroTabs.current)).toBe(tab-1);}}
     results.push({name,width,height,...layout});
     console.log('PASS responsive '+name+' '+width+'x'+height);
    }

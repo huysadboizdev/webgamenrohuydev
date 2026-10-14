@@ -422,7 +422,7 @@ namespace Game1
 			h = MotherCanvas.instance.getHeightz();
 			hw = w / 2;
 			hh = h / 2;
-			isTouch = true;
+			isTouch = true; // PRJ pointer input supports both desktop mouse and mobile touch.
 			if (w >= 240)
 			{
 				isTouchControl = true;

@@ -246,10 +246,9 @@ namespace Game2
 				cmd[i].x = (GameCanvas.w - cmd[i].w) / 2;
 				num += 30;
 			}
-		    if (NroWeb.BrowserPlatform.IsBrowser) ResizeBrowser();
 		}
 
-        public void ResizeBrowser()
+		public void ResizeBrowser()
         {
             if (cmd != null) {
                 int groupHeight = (cmd.Length - 1) * 30 + mScreen.cmdH;
@@ -270,7 +269,7 @@ namespace Game2
             }
         }
 
-		public static void doUpdateServer()
+        public static void doUpdateServer()
 		{
 			if (cmdUpdateServer == null && GameCanvas.serverScreen == null)
 			{
@@ -841,7 +840,6 @@ namespace Game2
 					cmdDownload.x = GameCanvas.w / 2 - mScreen.cmdW / 2;
 					cmdDownload.y = GameCanvas.h - mScreen.cmdH - 1;
 				}
-				if (NroWeb.BrowserPlatform.IsBrowser) ResizeBrowser();
 				center = new Command(string.Empty, this, 4, null);
 				if (!isGetData)
 				{

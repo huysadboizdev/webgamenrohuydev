@@ -479,6 +479,9 @@ namespace Game1
 
 		private static Char myPet;
 
+        internal static Char KnownPowerPet { get { return myPet; } }
+        internal static Char KnownPowerOwner { get { return myChar; } }
+
 		private static Char myPet2;
 
 		public static int[] listAttack;
@@ -853,7 +856,18 @@ namespace Game1
 
 		private string strEff_Set_Item = "set_eff_";
 
-		public short idEff_Set_Item = -1;
+        private short upgradeEffectId = -1;
+        public short idEff_Set_Item
+        {
+            get { return upgradeEffectId; }
+            set
+            {
+                if (upgradeEffectId == value) return;
+                upgradeEffectId = value;
+                fraEff = null;
+                fraEffSub = null;
+            }
+        }
 
 		private FrameImage fraHat_behind;
 
@@ -1188,6 +1202,7 @@ namespace Game1
 		public static void clearMyChar()
 		{
 			myChar = null;
+            myPet = null; // Do not reuse another account's disciple power after reconnecting.
 		}
 
 		public void boxSort()
@@ -5029,6 +5044,8 @@ namespace Game1
 
 		private void paintSuperEffBehind(mGraphics g)
 		{
+            if (BlackPowerAura.PaintBehind(g, this))
+                return;
 			if (me)
 			{
 				if (!isPaintAura && idAuraEff > -1)
@@ -5073,6 +5090,8 @@ namespace Game1
 
 		private void paintSuperEffFront(mGraphics g)
 		{
+            if (BlackPowerAura.IsReady(this))
+                return;
 			if (me)
 			{
 				if (!isPaintAura && idAuraEff > -1)
@@ -7078,7 +7097,7 @@ namespace Game1
 
 		public void paintAuraBehind(mGraphics g)
 		{
-			if ((!me || !isPaintAura) && idAuraEff > -1 && (statusMe == 1 || statusMe == 6) && !GameCanvas.panel.isShow && mSystem.currentTimeMillis() - timeBlue > 0)
+			if ((!me || isPaintAura) && idAuraEff > -1 && (statusMe == 1 || statusMe == 6) && !GameCanvas.panel.isShow && mSystem.currentTimeMillis() - timeBlue > 0)
 			{
 				FrameImage fraImage = mSystem.getFraImage(strEffAura + idAuraEff + "_0");
 				fraImage?.drawFrame(GameCanvas.gameTick / 4 % fraImage.nFrame, cx, cy, (cdir != 1) ? 2 : 0, mGraphics.BOTTOM | mGraphics.HCENTER, g);

@@ -53,14 +53,14 @@ namespace Game2
 			cmdGlobal.performAction();
 		}
 
-        public void ResizeBrowser()
+		public void ResizeBrowser()
         {
             int selected = mainSelect;
             sort();
             mainSelect = System.Math.Max(0, System.Math.Min(selected, vecServer.size() - 1));
         }
 
-		private void sort()
+        private void sort()
 		{
 			mainSelect = ServerListScreen.ipSelect;
 			w2c = 5;
@@ -75,14 +75,14 @@ namespace Game2
 			{
 				numw = 2;
 			}
-			numw = System.Math.Max(1, System.Math.Min(numw, System.Math.Min(vecServer.size(), (GameCanvas.w + w2c) / (wc + w2c))));
-			numh = vecServer.size() / numw + ((vecServer.size() % numw != 0) ? 1 : 0);
+			if (NroWeb.BrowserPlatform.IsBrowser) numw = System.Math.Max(1, System.Math.Min(numw, System.Math.Min(vecServer.size(), (GameCanvas.w + w2c) / (wc + w2c))));
+            numh = vecServer.size() / numw + ((vecServer.size() % numw != 0) ? 1 : 0);
 			for (int i = 0; i < vecServer.size(); i++)
 			{
 				Command command = (Command)vecServer.elementAt(i);
 				if (command != null)
 				{
-					int x = GameCanvas.hw - (numw * (wc + w2c) - w2c) / 2 + i % numw * (wc + w2c);
+					int x = GameCanvas.hw - numw * (wc + w2c) / 2 + i % numw * (wc + w2c);
 					int y = GameCanvas.hh - numh * (hc + w2c) / 2 + i / numw * (hc + w2c);
 					command.x = x;
 					command.y = y;

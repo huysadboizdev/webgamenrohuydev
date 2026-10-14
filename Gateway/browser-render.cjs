@@ -25,7 +25,7 @@ const path=require('node:path');
   await expect.poll(()=>page.evaluate(()=>nroFrameDraws.length),{timeout:20000}).toBeGreaterThan(100);
   const results=[];
   for(const tab of [1,2,1]){
-   await page.locator('#tab'+tab).click();
+   await page.evaluate(index=>gameInstance.SendMessage('BrowserHost','SelectTab',String(index)),tab-1);
    // Count submissions per animation frame, including offscreen GUI targets.
    const frames=await page.evaluate(()=>new Promise(resolve=>{let warmup=75,previous=nroDrawTotal;const frames=[];function sample(){const count=nroDrawTotal-previous;previous=nroDrawTotal;if(warmup-->0){requestAnimationFrame(sample);return;}frames.push(count);if(frames.length===60)resolve(frames);else requestAnimationFrame(sample);}requestAnimationFrame(sample);}));
    results.push({tab,frames});

@@ -47,7 +47,7 @@ const {createGateway} = require('./server.cjs');
     await page.waitForFunction(()=>typeof gameInstance!=='undefined'&&gameInstance!==null,{},{timeout:180000});
     await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game1')),{timeout:30000}).toBe(true);
     for(let tab=0;tab<2;tab++){
-      if(tab===1){await page.locator('#tab2').click();await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game2'))).toBe(true);}
+      if(tab===1){await page.evaluate(()=>gameInstance.SendMessage('BrowserHost','SelectTab','1'));await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game2'))).toBe(true);}
       const baseline=connections.filter(c=>c.handshake&&c.commands.length>0).length;
       await page.locator('#unity-canvas').focus();
       // Wait for the actual server-selection UI, then click its command.

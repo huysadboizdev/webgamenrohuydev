@@ -1,4 +1,3 @@
 Result=Succeeded
 Errors=0
-Warnings=0
-Bytes=84466683
+Warnings=70

@@ -45,6 +45,7 @@ namespace NroWeb
         public static void TabChanged(int tab)
         {
             BrowserPlatform.CloseInput();
+            Game1.ipKeyboard.CancelBrowser(); Game2.ipKeyboard.CancelBrowser();
             if (Game1.TField.currentTField != null) Game1.TField.currentTField.setFocus(false);
             if (Game2.TField.currentTField != null) Game2.TField.currentTField.setFocus(false);
             Game1.GameCanvas.clearKeyHold(); Game1.GameCanvas.clearKeyPressed();

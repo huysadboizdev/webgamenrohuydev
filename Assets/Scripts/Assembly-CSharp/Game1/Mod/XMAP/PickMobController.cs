@@ -37,7 +37,7 @@ namespace Game1.Mod.XMAP
 				return;
 			}
 			Char @char = Char.myCharz();
-			if (@char.statusMe == 14 || @char.cHP <= 0)
+			if (!CanAutoAct(@char))
 			{
 				return;
 			}
@@ -92,69 +92,37 @@ namespace Game1.Mod.XMAP
 				{
 					@char.mobFocus = null;
 				}
-				if (@char.mobFocus == null)
-				{
-					@char.mobFocus = GetMobTanSat();
-					if (flag && @char.mobFocus != null)
-					{
-						if (PickMob.telePem)
-						{
-							if (Math.abs(@char.mobFocus.xFirst - @char.cx) >= 20 || Math.abs(@char.mobFocus.yFirst - @char.cy) >= 20)
-							{
-								ModFunc.GI().MoveTo(@char.mobFocus.xFirst, @char.mobFocus.yFirst);
-							}
-							return;
-						}
-						@char.cx = @char.mobFocus.xFirst;
-						@char.cy = @char.mobFocus.yFirst;
-						Service.gI().charMove();
-					}
-				}
-				if (@char.mobFocus != null)
-				{
-					if (@char.skillInfoPaint() == null)
-					{
-						Skill skillAttack = GetSkillAttack();
-						if (skillAttack != null && CanUseSkill(skillAttack))
-						{
-							Mob mobFocus = @char.mobFocus;
-							mobFocus.x = mobFocus.xFirst;
-							mobFocus.y = mobFocus.yFirst;
-							if (Char.myCharz().myskill != skillAttack)
-							{
-								GameScr.gI().doSelectSkill(skillAttack, isShortcut: true);
-							}
-							if (Res.distance(mobFocus.xFirst, mobFocus.yFirst, @char.cx, @char.cy) <= 48)
-							{
-								if (GameCanvas.gameTick % 50 == 0 && Mob.arrMobTemplate[Char.myCharz().mobFocus.templateId].type == 4)
-								{
-									ModFunc.GI().MoveTo(mobFocus.xFirst, mobFocus.yFirst + 1);
-								}
-								if (skillAttack.template.isAttackSkill())
-								{
-									ModFunc.GI().AttackMob(mobFocus);
-									ModFunc.GI().SetUsedSkill(@char.myskill);
-								}
-								else if (skillAttack.template.isUseAlone())
-								{
-									ModFunc.GI().DoDoubleClickToObj(mobFocus);
-								}
-							}
-							else
-							{
-								if (PickMob.telePem)
-								{
-									if (Math.abs(mobFocus.xFirst - @char.cx) >= 20 || Math.abs(mobFocus.yFirst - @char.cy) >= 20)
-									{
-										ModFunc.GI().MoveTo(mobFocus.xFirst, mobFocus.yFirst);
-									}
-									return;
-								}
-								Move(mobFocus.xFirst, mobFocus.yFirst);
-							}
-						}
-					}
-				}
+                if (@char.mobFocus == null) @char.mobFocus = GetMobTanSat();
+                if (@char.mobFocus != null && @char.skillInfoPaint() == null)
+                {
+                    Skill skillAttack = GetSkillAttack();
+                    Mob target = @char.mobFocus;
+                    if (skillAttack != null)
+                    {
+                        if (Res.distance(target.xFirst, target.yFirst, @char.cx, @char.cy) > 48)
+                        {
+                            if (PickMob.telePem) TryMoveForAutoAttack(target.xFirst, target.yFirst);
+                            else Move(target.xFirst, target.yFirst);
+                            Wait(100);
+                            return;
+                        }
+                        if (!EnsurePositionSent()) return;
+                        if (GameScr.gI().TrySelectSkillForAutoCombat(skillAttack))
+                        {
+                            if (skillAttack.template.isAttackSkill())
+                            {
+                                MyVector mobs = new MyVector();
+                                mobs.addElement(target);
+                                if (Service.gI().TrySendPlayerAttack(mobs, new MyVector(), 1))
+                                    ModFunc.GI().SetUsedSkill(skillAttack);
+                            }
+                            else if (skillAttack.template.isUseAlone())
+                            {
+                                ModFunc.GI().DoDoubleClickToObj(target);
+                            }
+                        }
+                    }
+                }
 				else if (!flag)
 				{
 					Mob mobNext = GetMobNext();
@@ -165,7 +133,7 @@ namespace Game1.Mod.XMAP
 						{
 							if (Math.abs(mobNext.xFirst - @char.cx) >= 20 || Math.abs(mobNext.yFirst - @char.cy) >= 20)
 							{
-								ModFunc.GI().MoveTo(mobNext.xFirst, mobNext.yFirst);
+								TryMoveForAutoAttack(mobNext.xFirst, mobNext.yFirst);
 							}
 							return;
 						}
@@ -198,25 +166,21 @@ namespace Game1.Mod.XMAP
 						{
 							if (Math.abs(@char.charFocus.cx - @char.cx) >= 20 || Math.abs(@char.charFocus.cy - @char.cy) >= 20)
 							{
-								ModFunc.GI().MoveTo(@char.charFocus.cx, @char.charFocus.cy);
+								TryMoveForAutoAttack(@char.charFocus.cx, @char.charFocus.cy);
 							}
 							return;
 						}
-						@char.cx = @char.charFocus.cx;
-						@char.cy = @char.charFocus.cy;
-						Service.gI().charMove();
+                        TryMoveForAutoAttack(@char.charFocus.cx, @char.charFocus.cy);
+                        return;
 					}
 				}
 				if (@char.charFocus != null && @char.skillInfoPaint() == null)
 				{
 					Skill skillAttack2 = GetSkillAttack();
-					if (skillAttack2 != null && !skillAttack2.paintCanNotUseSkill)
+					if (skillAttack2 != null && CanUseSkill(skillAttack2))
 					{
 						Char charFocus = @char.charFocus;
-						if (@char.myskill != skillAttack2)
-						{
-							GameScr.gI().doSelectSkill(skillAttack2, isShortcut: true);
-						}
+                        if (!EnsurePositionSent() || !GameScr.gI().TrySelectSkillForAutoCombat(skillAttack2)) return;
 						if (Res.distance(charFocus.cx, charFocus.cy, @char.cx, @char.cy) <= 48)
 						{
 							ModFunc.GI().DoDoubleClickToObj(charFocus);
@@ -227,7 +191,7 @@ namespace Game1.Mod.XMAP
 							{
 								if (Math.abs(charFocus.cx - @char.cx) >= 20 || Math.abs(charFocus.cy - @char.cy) >= 20)
 								{
-									ModFunc.GI().MoveTo(charFocus.cx, charFocus.cy);
+									TryMoveForAutoAttack(charFocus.cx, charFocus.cy);
 								}
 								return;
 							}
@@ -238,6 +202,38 @@ namespace Game1.Mod.XMAP
 				Wait(100);
 			}
 		}
+
+        private static bool CanAutoAct(Char player)
+        {
+            return player != null && Service.gI().IsCombatConnectionReady()
+                && !Char.isLoadingMap && !Char.ischangingMap && !Controller.isStopReadMessage
+                && !player.meDead && player.statusMe != 14 && player.statusMe != 5 && player.cHP > 0
+                && !player.stone && !player.sleepEff && !player.blindEff && player.holdEffID == 0
+                && !player.isTeleport && !player.telePortSkill && !player.isCreateDark
+                && !player.isCharge && !player.isStandAndCharge && !player.isFlyAndCharge
+                && !player.isUseSkillAfterCharge && !player.isWaitMonkey;
+        }
+
+        private static bool TryMoveForAutoAttack(int x, int y)
+        {
+            Char player = Char.myCharz();
+            if (!CanAutoAct(player)) return false;
+            y = System.Math.Max(1, y);
+            int oldX = player.cx, oldY = player.cy;
+            player.cx = x; player.cy = y;
+            if (Service.gI().TryCharMove()) return true;
+            player.cx = oldX; player.cy = oldY;
+            return false;
+        }
+
+        private static bool EnsurePositionSent()
+        {
+            Char player = Char.myCharz();
+            if (player.cx == player.cxSend && player.cy == player.cySend) return true;
+            Service.gI().TryCharMove();
+            Wait(100);
+            return false;
+        }
 
 		public static void Move(int x, int y)
 		{
@@ -349,7 +345,8 @@ namespace Game1.Mod.XMAP
 
 		private static bool IsMobTanSat(Mob mob)
 		{
-			if (mob.status == 0 || mob.status == 1 || mob.hp <= 0 || mob.isMobMe)
+			if (mob == null || !GameScr.vMob.contains(mob) || !GameScr.gI().isMeCanAttackMob(mob)
+                || mob.status == 0 || mob.status == 1 || mob.hp <= 0 || mob.isMobMe)
 			{
 				return false;
 			}
@@ -442,7 +439,7 @@ namespace Game1.Mod.XMAP
 
 		private static bool IsSkillBetter(Skill SkillBetter, Skill skill)
 		{
-			if (SkillBetter == null)
+			if (!CanUseSkill(SkillBetter))
 			{
 				return false;
 			}
@@ -462,18 +459,15 @@ namespace Game1.Mod.XMAP
 			return skill.coolDown < SkillBetter.coolDown || flag;
 		}
 
-		private static bool CanUseSkill(Skill skill)
-		{
-			if (mSystem.currentTimeMillis() - skill.lastTimeUseThisSkill > (long)skill.coolDown + 25L)
-			{
-				skill.paintCanNotUseSkill = false;
-			}
-			if (!skill.paintCanNotUseSkill)
-			{
-				return Char.myCharz().cMP >= GetManaUseSkill(skill);
-			}
-			return false;
-		}
+        private static bool CanUseSkill(Skill skill)
+        {
+            if (skill == null || skill.template == null) return false;
+            if (mSystem.currentTimeMillis() - skill.lastTimeUseThisSkill <= (long)skill.coolDown + 25L) return false;
+            Char player = Char.myCharz();
+            if (skill.template.id == 9 && player.cHP <= player.cHPFull / 10) return false;
+            skill.paintCanNotUseSkill = false;
+            return player.cMP >= GetManaUseSkill(skill);
+        }
 
 		private static long GetManaUseSkill(Skill skill)
 		{

@@ -1,11 +1,24 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
-const html=fs.readFileSync(path.join(__dirname,'../Assets/WebGLTemplates/NroWeb/index.html'),'utf8');
-const resize=html.match(/function resize\(\)\{[^\n]+\}/)[0];
-for(const [device,width,height] of [['pc',1920,1080],['pc',3840,2160],['pc',800,480],['android',390,780],['ios',844,390]]){
- test(`${device} ${width}x${height}: bounded rendering, full display and positive canvas`,()=>{
-  const context={device,view:{clientWidth:width,clientHeight:height},canvas:{style:{}},Math};vm.runInNewContext(resize+';resize();',context);
-  assert(context.canvas.width<=1024,'High-resolution screen multiplies render work');assert(context.canvas.width>0&&context.canvas.height>0);
-  if(device==='pc'){assert(parseFloat(context.canvas.style.width)<=width);assert(parseFloat(context.canvas.style.height)<=height);assert(Math.abs(context.canvas.width/context.canvas.height-1024/600)<.01);if(width>=1920)assert(parseFloat(context.canvas.style.width)>1024,'Display must still fill available space');}
- });
+for(const file of ['Assets/WebGLTemplates/NroWeb/index.html','Builds/WebGL/index.html']) {
+ const html=fs.readFileSync(path.join(__dirname,'..',file),'utf8');
+ const resize=html.match(/function resize\(\)\{[^\n]+\}/)[0];
+ for(const [width,height] of [[1920,926],[3840,2160],[1280,800],[800,480],[320,568]]){
+  test(`${file}: PC ${width}x${height} keeps native 1024x600 without enlargement`,()=>{
+   const context={device:'pc',view:{clientWidth:width,clientHeight:height},canvas:{style:{}},Math};vm.runInNewContext(resize+';resize();',context);
+   assert.equal(context.canvas.width,1024);assert.equal(context.canvas.height,600);
+   const scale=Math.min(1,width/1024,height/600);
+   assert.equal(parseFloat(context.canvas.style.width),1024*scale);
+   assert.equal(parseFloat(context.canvas.style.height),600*scale);
+   assert(context.canvas.style.width.endsWith('px'));assert(context.canvas.style.height.endsWith('px'));
+  });
+ }
+ for(const [device,width,height] of [['android',390,780],['android',844,390],['ios',844,390]]){
+  test(`${file}: ${device} uses mobile viewport`,()=>{
+   const c={device,view:{clientWidth:width,clientHeight:height},canvas:{style:{}},Math};vm.runInNewContext(resize+';resize();',c);
+   assert(c.canvas.width<=1024&&c.canvas.height<=768);assert(c.canvas.width>0&&c.canvas.height>0);
+   assert.equal(c.canvas.style.width,'100%');assert.equal(c.canvas.style.height,'100%');
+   assert(Math.abs(c.canvas.width/c.canvas.height-width/height)<.01);
+  });
+ }
+ test(`${file}: browser pixel ratio cannot magnify the canvas`,()=>assert(html.includes('matchWebGLToCanvasSize:false')&&html.includes('devicePixelRatio:1')));
 }
-test('Unity preserves explicitly bounded backing buffer',()=>assert(html.includes('matchWebGLToCanvasSize:false')));

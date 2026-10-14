@@ -654,7 +654,7 @@ namespace Game2
 		public void update()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
-            if (currentTField == this && isFocus && NroWeb.BrowserPlatform.InputState != 0) {
+            if (Management.tab == TabType.Tab2 && currentTField == this && isFocus && NroWeb.BrowserPlatform.HasFieldInput && NroWeb.BrowserPlatform.InputState != 0) {
                 setText(NroWeb.BrowserPlatform.InputValue);
                 if (NroWeb.BrowserPlatform.InputState == 2) {
                     NroWeb.BrowserPlatform.CloseInput();
@@ -757,6 +757,7 @@ if (!isFocus && currentTField == this) NroWeb.BrowserPlatform.CloseInput();
 
 		public void setFocusWithKb(bool isFocus)
 		{
+            if (!isFocus && currentTField == this) NroWeb.BrowserPlatform.CloseInput();
 			if (this.isFocus != isFocus)
 			{
 				mode = 0;

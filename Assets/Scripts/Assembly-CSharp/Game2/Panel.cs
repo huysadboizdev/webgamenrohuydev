@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Threading;
 using Game2.Assets.src.g;
@@ -10516,6 +10516,7 @@ else
                 }
                 item3.isSelect = true;
                 Item item4 = new Item();
+                item4.quantity = 1;
                 item4.template = item3.template;
                 item4.itemOption = item3.itemOption;
                 item4.indexUI = item3.indexUI;

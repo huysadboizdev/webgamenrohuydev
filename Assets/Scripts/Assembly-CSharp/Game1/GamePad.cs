@@ -41,11 +41,6 @@ namespace Game1
 		public int hZone;
 
 		private bool isGamePad;
-        private readonly bool[] heldDirections = new bool[4];
-        private static readonly UnityEngine.KeyCode[] directionKeys = {
-            UnityEngine.KeyCode.UpArrow, UnityEngine.KeyCode.DownArrow,
-            UnityEngine.KeyCode.LeftArrow, UnityEngine.KeyCode.RightArrow
-        };
 
 		public bool isSmallGamePad;
 
@@ -118,7 +113,6 @@ namespace Game1
 					d = Res.sqrt(delta);
 					if (Math.abs(deltaX) <= 4 && Math.abs(deltaY) <= 4)
 					{
-                        resetHold();
 						return;
 					}
 					angle = Res.angle(deltaX, deltaY);
@@ -157,37 +151,47 @@ namespace Game1
 					{
 						if ((angle <= 360 && angle >= 340) || (angle >= 0 && angle <= 20))
 						{
-							holdKey((!Main.isPC) ? 6 : 24);
+							GameCanvas.keyHold[(!Main.isPC) ? 6 : 24] = true;
+							GameCanvas.keyPressed[(!Main.isPC) ? 6 : 24] = true;
 						}
 						else if (angle > 40 && angle < 70)
 						{
-							holdKey((!Main.isPC) ? 6 : 24);
+							GameCanvas.keyHold[(!Main.isPC) ? 6 : 24] = true;
+							GameCanvas.keyPressed[(!Main.isPC) ? 6 : 24] = true;
 						}
 						else if (angle >= 70 && angle <= 110)
 						{
-							holdKey((!Main.isPC) ? 8 : 22);
+							GameCanvas.keyHold[(!Main.isPC) ? 8 : 22] = true;
+							GameCanvas.keyPressed[(!Main.isPC) ? 8 : 22] = true;
 						}
 						else if (angle > 110 && angle < 120)
 						{
-							holdKey((!Main.isPC) ? 4 : 23);
+							GameCanvas.keyHold[(!Main.isPC) ? 4 : 23] = true;
+							GameCanvas.keyPressed[(!Main.isPC) ? 4 : 23] = true;
 						}
 						else if (angle >= 120 && angle <= 200)
 						{
-							holdKey((!Main.isPC) ? 4 : 23);
+							GameCanvas.keyHold[(!Main.isPC) ? 4 : 23] = true;
+							GameCanvas.keyPressed[(!Main.isPC) ? 4 : 23] = true;
 						}
 						else if (angle > 200 && angle < 250)
 						{
-							holdKey((!Main.isPC) ? 2 : 21);
-							holdKey((!Main.isPC) ? 4 : 23);
+							GameCanvas.keyHold[(!Main.isPC) ? 2 : 21] = true;
+							GameCanvas.keyPressed[(!Main.isPC) ? 2 : 21] = true;
+							GameCanvas.keyHold[(!Main.isPC) ? 4 : 23] = true;
+							GameCanvas.keyPressed[(!Main.isPC) ? 4 : 23] = true;
 						}
 						else if (angle >= 250 && angle <= 290)
 						{
-							holdKey((!Main.isPC) ? 2 : 21);
+							GameCanvas.keyHold[(!Main.isPC) ? 2 : 21] = true;
+							GameCanvas.keyPressed[(!Main.isPC) ? 2 : 21] = true;
 						}
 						else if (angle > 290 && angle < 340)
 						{
-							holdKey((!Main.isPC) ? 2 : 21);
-							holdKey((!Main.isPC) ? 6 : 24);
+							GameCanvas.keyHold[(!Main.isPC) ? 2 : 21] = true;
+							GameCanvas.keyPressed[(!Main.isPC) ? 2 : 21] = true;
+							GameCanvas.keyHold[(!Main.isPC) ? 6 : 24] = true;
+							GameCanvas.keyPressed[(!Main.isPC) ? 6 : 24] = true;
 						}
 					}
 					else
@@ -243,34 +247,10 @@ namespace Game1
 			return true;
 		}
 
-		public void release()
-        {
-            resetHold();
-            isGamePad = false;
-        }
-
-        private void holdKey(int key)
-        {
-            if (NroWeb.BrowserPlatform.IsBrowser && Main.isPC && key >= 21 && key <= 24)
-                heldDirections[key - 21] = true;
-            GameCanvas.keyHold[key] = true;
-            GameCanvas.keyPressed[key] = true;
-        }
-
-        private void resetHold()
-        {
-            if (NroWeb.BrowserPlatform.IsBrowser && Main.isPC) {
-                // Release only directions owned by this pad. Physical keys can
-                // remain held, including an arrow pressed during the drag.
-                for (int i = 0; i < heldDirections.Length; i++) {
-                    if (!heldDirections[i]) continue;
-                    GameCanvas.keyHold[21 + i] = UnityEngine.Input.GetKey(directionKeys[i]);
-                    heldDirections[i] = false;
-                }
-                return;
-            }
-            GameCanvas.clearKeyHold();
-        }
+		private void resetHold()
+		{
+			GameCanvas.clearKeyHold();
+		}
 
 		public void paint(mGraphics g)
 		{

@@ -141,7 +141,7 @@ namespace Game2
 					mFont.tahoma_7_white.drawStringBorder(g, mResources.xoadulieu, GameCanvas.w - 2, GameCanvas.h - 15, 1, mFont.tahoma_7_grey);
 				}
 				GameCanvas.paintShukiren(GameCanvas.hw, GameCanvas.h / 2 + 24, g);
-				mFont.tahoma_7b_white.drawString(g, mResources.downloading_data + nData * 100 / maxData + "%", GameCanvas.w / 2, GameCanvas.h / 2, 2);
+				mFont.tahoma_7b_white.drawString(g, mResources.downloading_data + (maxData > 0 ? (int)System.Math.Min(100L, (long)nData * 100 / maxData) : 0) + "%", GameCanvas.w / 2, GameCanvas.h / 2, 2);
 			}
 			else if (splashScrStat >= 30)
 			{

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.NetworkInformation;
 using System.Threading;
 using UnityEngine;
@@ -105,7 +105,7 @@ namespace Game1
             mainThreadName = "Main";
             isIPhone = IphoneVersionApp = NroWeb.BrowserPlatform.IsMobile;
             isPC = !isIPhone;
-            GameCanvas.isTouch = true; // Mouse and touch both use the original pointer handlers.
+            GameCanvas.isTouch = isIPhone;
 #else
             if (Thread.CurrentThread.Name != "Main")
 			{
@@ -324,6 +324,7 @@ return "WEB-" + SystemInfo.deviceUniqueIdentifier;
 		
 		private void FixedUpdate()
 		{
+
 			Rms.update();
 			count++;
 			if (count >= 10)
@@ -347,7 +348,6 @@ return "WEB-" + SystemInfo.deviceUniqueIdentifier;
 					GameMidlet.gameCanvas.update();
 				}
 #if UNITY_WEBGL && !UNITY_EDITOR
-                // Send the connection/zoom setup before resource-version packets can request data.
                 Session_ME.update(); Session_ME2.update();
 #endif
 				Image.update();

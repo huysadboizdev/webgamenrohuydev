@@ -27,6 +27,6 @@ for tab,index in [('Game1','Tab1'),('Game2','Tab2')]:
 #endif''')
     p.write_text(s,encoding='utf-8')
     p=root/'Assets/Scripts/Assembly-CSharp'/tab/'GameCanvas.cs';s=p.read_text(encoding='utf-8')
-    s=s.replace('isTouch = true;','isTouch = NroWeb.BrowserPlatform.IsBrowser ? NroWeb.BrowserPlatform.IsMobile : true;')
+    # Keep PRJ's isTouch=true: this enables mouse hit tests as well as touch.
     p.write_text(s,encoding='utf-8')
 print('Per-tab IndexedDB save branches integrated')

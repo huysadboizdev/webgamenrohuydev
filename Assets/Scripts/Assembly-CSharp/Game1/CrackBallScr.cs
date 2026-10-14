@@ -786,7 +786,8 @@ new Thread(AutoCrackBall).Start();
 #if UNITY_WEBGL && !UNITY_EDITOR
 public void AutoCrackBall() { NroWeb.BrowserHost.Run(AutoCrackBallBrowser()); }
 private System.Collections.IEnumerator AutoCrackBallBrowser() {
-int num = 0; bool flag = false;
+int num = 0;
+bool flag = false;
 while (isAutoCrackBall && GameCanvas.currentScreen == instance)
 				{
 					indexSkillSelect = 2;

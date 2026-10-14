@@ -968,7 +968,7 @@ public void RemoveAllItem()
 			imgNextCenter = GameCanvas.loadImage("/mainImage/nextMiddle.png");
 			imgNextCenterF = GameCanvas.loadImage("/mainImage/nextMiddleF.png");
 			MobCapcha.init();
-			isAnalog = ((Rms.loadRMSInt("analog") != 0) ? ((Main.isIPhone || (NroWeb.BrowserPlatform.IsBrowser && Rms.loadRMSInt("analog") == 1)) ? 1 : 0) : 0);
+			isAnalog = ((Rms.loadRMSInt("analog") != 0) ? (Main.isIPhone ? 1 : 0) : 0);
 			gamePad = new GamePad();
 			arrow = GameCanvas.loadImage("/mainImage/myTexture2darrow3.png");
 			imgTrans = GameCanvas.loadImage("/bg/trans.png");
@@ -1713,15 +1713,16 @@ public void RemoveAllItem()
 			}
 		}
 
-        public static void RefreshBrowserControls()
+		public static void RefreshBrowserControls()
         {
-            if (gamePad != null) gamePad.release();
+            GameCanvas.clearKeyHold(); GameCanvas.clearKeyPressed();
+            GameCanvas.isPointerDown = GameCanvas.isPointerClick = GameCanvas.isPointerJustDown = GameCanvas.isPointerMove = false;
             GameCanvas.isTouchControlSmallScreen = GameCanvas.w < 320;
             GameCanvas.isTouchControlLargeScreen = GameCanvas.w >= 320;
             gamePad = new GamePad();
         }
 
-		public static void setSkillBarPosition()
+        public static void setSkillBarPosition()
 		{
 			Skill[] array = ((!GameCanvas.isTouch) ? keySkill : onScreenSkill);
 			xS = new int[array.Length];
@@ -3847,6 +3848,15 @@ public void RemoveAllItem()
 			return true;
 		}
 
+        public bool TrySelectSkillForAutoCombat(Skill skill)
+        {
+            if (skill == null || skill.template == null || !Service.gI().TrySelectSkill(skill.template.id)) return false;
+            Char.myCharz().myskill = skill;
+            lastSkill = skill;
+            selectedIndexSkill = -1;
+            return true;
+        }
+
 		public void doSelectSkill(Skill skill, bool isShortcut)
 		{
 			if (Char.myCharz().isCreateDark || isCharging() || Char.myCharz().taskMaint.taskId <= 1 || ModFunc.isShowMenuChat)
@@ -4221,10 +4231,10 @@ public void RemoveAllItem()
 					GameCanvas.isPointerJustRelease = false;
 				}
 				GameCanvas.keyHold[1] = false;
-				GameCanvas.keyHold[(!Main.isPC) ? 2 : 21] = NroWeb.BrowserPlatform.IsBrowser && Main.isPC && UnityEngine.Input.GetKey(UnityEngine.KeyCode.UpArrow);
+				GameCanvas.keyHold[(!Main.isPC) ? 2 : 21] = false;
 				GameCanvas.keyHold[3] = false;
-				GameCanvas.keyHold[(!Main.isPC) ? 4 : 23] = NroWeb.BrowserPlatform.IsBrowser && Main.isPC && UnityEngine.Input.GetKey(UnityEngine.KeyCode.LeftArrow);
-				GameCanvas.keyHold[(!Main.isPC) ? 6 : 24] = NroWeb.BrowserPlatform.IsBrowser && Main.isPC && UnityEngine.Input.GetKey(UnityEngine.KeyCode.RightArrow);
+				GameCanvas.keyHold[(!Main.isPC) ? 4 : 23] = false;
+				GameCanvas.keyHold[(!Main.isPC) ? 6 : 24] = false;
 			}
 		}
 

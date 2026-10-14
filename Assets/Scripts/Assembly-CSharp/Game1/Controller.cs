@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Game1.Assets.src.e;
 using Game1.Assets.src.f;
 using Game1.Assets.src.g;
@@ -603,6 +603,12 @@ namespace Game1
 						short num16 = msg.reader().readShort();
 						short num17 = msg.reader().readShort();
 						sbyte isMonkey = msg.reader().readByte();
+                        // Optional tail from newer servers; older appearance packets remain valid.
+                        if (msg.reader().available() > 0)
+                        {
+                            short effect = msg.reader().readSByte();
+                            if (@char != null) @char.idEff_Set_Item = effect;
+                        }
 						if (@char != null)
 						{
 							if (@char.charID == num14)
@@ -1174,9 +1180,12 @@ namespace Game1
 					if (b42 == 1)
 					{
 						ServerListScreen.strWait = mResources.downloading_data;
-						ServerListScreen.nBig = msg.reader().readUnsignedShort();
-                        ServerListScreen.demPercent = 0;
-                        ServerListScreen.percent = 0;
+						#if UNITY_WEBGL && !UNITY_EDITOR
+                        ServerListScreen.nBig = msg.reader().readUnsignedShort();
+                        ServerListScreen.demPercent = 0; ServerListScreen.percent = 0;
+#else
+                        ServerListScreen.nBig = msg.reader().readShort();
+#endif
 						Service.gI().getResource(2, null);
 					}
 					if (b42 == 2)
@@ -1186,7 +1195,11 @@ namespace Game1
 							isLoadingData = true;
 							GameCanvas.endDlg();
 							ServerListScreen.demPercent++;
-							ServerListScreen.percent = ServerListScreen.nBig > 0 ? (int)System.Math.Min(100L, (long)ServerListScreen.demPercent * 100 / ServerListScreen.nBig) : 0;
+							#if UNITY_WEBGL && !UNITY_EDITOR
+                            ServerListScreen.percent = ServerListScreen.nBig > 0 ? (int)System.Math.Min(100L, (long)ServerListScreen.demPercent * 100 / ServerListScreen.nBig) : 0;
+#else
+                            ServerListScreen.percent = ServerListScreen.demPercent * 100 / ServerListScreen.nBig;
+#endif
 							string[] array14 = Res.split(msg.reader().readUTF(), "/", 0);
 							string filename = "x" + mGraphics.zoomLevel + array14[array14.Length - 1];
 							int num152 = msg.reader().readInt();
