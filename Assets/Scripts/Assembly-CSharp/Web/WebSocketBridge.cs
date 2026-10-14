@@ -56,9 +56,11 @@ namespace NroWeb
             int id;
             Action opened, ended;
             Action<byte[]> bytes;
+#if UNITY_WEBGL && !UNITY_EDITOR
             [DllImport("__Internal")] static extern void NroWSOpen(int id, string receiver, string host, int port);
             [DllImport("__Internal")] static extern int NroWSSend(int id, byte[] data, int length);
             [DllImport("__Internal")] static extern void NroWSClose(int id);
+#endif
             public void Open(string host, int port, Action onOpened, Action<byte[]> onBytes, Action onEnded)
             {
                 Close(); opened = onOpened; bytes = onBytes; ended = onEnded;
