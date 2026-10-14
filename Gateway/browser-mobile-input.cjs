@@ -48,6 +48,10 @@ const {createGateway} = require('./server.cjs');
     page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.accept();});
     await page.route('**/config.js',route=>route.fulfill({contentType:'application/javascript',body:"window.NRO_WEB_CONFIG={serverList:'Fixture:"+target+":0,0,0'};"}));
     await page.goto('http://127.0.0.1:'+server.address().port);
+    if(process.env.MOBILE_KIND!=='ios'&&await page.evaluate(()=>window.NroFullscreenController.isSupported)){
+      await page.getByRole('button',{name:process.env.MOBILE_FULLSCREEN==='enter'?'Bật toàn màn hình':'Để sau',exact:true}).tap();
+      if(process.env.MOBILE_FULLSCREEN==='enter')await expect.poll(()=>page.evaluate(()=>document.fullscreenElement?.id)).toBe('game');
+    }
     await page.waitForFunction(()=>typeof gameInstance!=='undefined'&&gameInstance!==null,{},{timeout:180000});
     await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game1')),{timeout:30000}).toBe(true);
     for(let tab=0;tab<2;tab++){
@@ -97,6 +101,18 @@ const {createGateway} = require('./server.cjs');
         }
         return false;
       },{account,tab:tab+1}),{timeout:15000}).toBe(true);
+      if(tab===0&&process.env.MOBILE_FULLSCREEN==='enter'){
+        const baselineConnections=connections.length;
+        await page.evaluate(()=>{window.fixtureOriginalPlayer=gameInstance;NroFullscreenController.offer();});
+        await page.getByRole('button',{name:'Thoát toàn màn hình',exact:true}).tap();
+        await expect.poll(()=>page.evaluate(()=>document.fullscreenElement===null)).toBe(true);
+        await page.evaluate(()=>{NroFullscreenController.offer();});
+        await page.getByRole('button',{name:'Bật toàn màn hình',exact:true}).tap();
+        await expect.poll(()=>page.evaluate(()=>document.fullscreenElement?.id)).toBe('game');
+        expect(await page.evaluate(()=>gameInstance===fixtureOriginalPlayer&&NroTabs.current===0)).toBe(true);
+        expect(connections.length).toBe(baselineConnections);
+        await expect(page.locator('#nro-fullscreen-prompt')).toHaveCount(0);
+      }
     }
     // Playwright's Windows WebKit port lacks Web Audio; real iOS Safari does not.
     const environmentWarnings=engine==='webkit'?dialogs.filter(s=>s==='Web Audio API is not supported in this browser'):[];

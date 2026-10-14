@@ -55,6 +55,10 @@ namespace NroWeb
             Game1.mScreen.keyTouch = Game2.mScreen.keyTouch = -1;
             BrowserPlatform.NotifyTabChanged(tab);
         }
+        public void ClearBrowserInput(string reason)
+        {
+            TabChanged((int)Management.tab);
+        }
         public void Paste(string text)
         {
             if (Management.tab == TabType.Tab1 && Game1.TField.currentTField != null) Game1.TField.currentTField.pasteText(text);

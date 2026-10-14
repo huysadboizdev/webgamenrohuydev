@@ -20,6 +20,8 @@ mergeInto(LibraryManager.library, {
     var device = window.NroDevice ? window.NroDevice.classify(navigator) : 'pc';
     return device === 'android' ? 1 : device === 'ios' ? 2 : 0;
   },
+  NroFullscreenAvailable: function () { return window.NroFullscreenController && window.NroFullscreenController.isSupported ? 1 : 0; },
+  NroFullscreenMenu: function () { if (window.NroFullscreenController) window.NroFullscreenController.offer(); },
   NroServerList: function () {
     var value = (window.NRO_WEB_CONFIG || {}).serverList || 'NRO NGU:127.0.0.1:14445:0,0,0';
     var size = lengthBytesUTF8(value) + 1;

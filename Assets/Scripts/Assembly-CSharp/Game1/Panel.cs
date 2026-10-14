@@ -11836,6 +11836,10 @@ else
 
         private void doFireOption()
         {
+            if (NroWeb.BrowserPlatform.CanOfferFullscreen && selected == strCauhinh.Length - 1) {
+                NroWeb.BrowserPlatform.ShowFullscreenMenu();
+                return;
+            }
             if (selected >= 0)
             {
                 switch (selected)

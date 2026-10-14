@@ -13,6 +13,8 @@ namespace NroWeb
         [DllImport("__Internal")] private static extern string NroInputValue();
         [DllImport("__Internal")] private static extern int NroInputState();
         [DllImport("__Internal")] private static extern void NroInputClose();
+        [DllImport("__Internal")] private static extern int NroFullscreenAvailable();
+        [DllImport("__Internal")] private static extern void NroFullscreenMenu();
 #endif
         public static bool IsBrowser {
             get {
@@ -31,6 +33,23 @@ namespace NroWeb
                 return Application.platform == RuntimePlatform.Android || Application.platform == RuntimePlatform.IPhonePlayer;
 #endif
             }
+        }
+        public static bool CanOfferFullscreen {
+            get {
+#if UNITY_WEBGL && !UNITY_EDITOR
+                return NroFullscreenAvailable() != 0;
+#else
+                return false;
+#endif
+            }
+        }
+        public static void ShowFullscreenMenu() {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            if (CanOfferFullscreen) {
+                BrowserHost.TabChanged((int)Management.tab);
+                NroFullscreenMenu();
+            }
+#endif
         }
         public static string ServerList {
             get {

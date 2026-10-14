@@ -264,6 +264,10 @@ namespace Game2
 					(!GameCanvas.lowGraphic) ? (text2 + mResources.cauhinhthap.Trim()) : (text + mResources.cauhinhthap.Trim()),
 					text3
 				};
+                if (NroWeb.BrowserPlatform.CanOfferFullscreen) {
+                    System.Array.Resize(ref Panel.strCauhinh, Panel.strCauhinh.Length + 1);
+                    Panel.strCauhinh[Panel.strCauhinh.Length - 1] = "Toàn màn hình";
+                }
 			}
 		}
 
