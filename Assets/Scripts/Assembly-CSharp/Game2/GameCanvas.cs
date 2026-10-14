@@ -1881,6 +1881,8 @@ namespace Game2
 			catch (Exception)
 			{
 				isLoadBGok = false;
+				TileMap.lastBgID = -1;
+				TileMap.lastType = -1;
 			}
 		}
 
@@ -2527,33 +2529,48 @@ namespace Game2
 
 		public static Image loadImageRMS(string path)
 		{
+			string backgroundPath = path;
 			path = Main.res + "/x" + mGraphics.zoomLevel + path;
 			path = cutPng(path);
 			Image result = null;
 			try
 			{
 				result = Image.createImage(path);
-				return result;
 			}
 			catch (Exception ex)
 			{
 				try
 				{
 					string[] array = Res.split(path, "/", 0);
-					sbyte[] array2 = Rms.loadRMS("x" + mGraphics.zoomLevel + array[^1]);
+					sbyte[] array2 = Rms.loadRMS("x" + mGraphics.zoomLevel + array[array.Length - 1]);
 					if (array2 != null)
 					{
 						result = Image.createImage(array2, 0, array2.Length);
-						return result;
 					}
-					return result;
 				}
 				catch (Exception)
 				{
 					Cout.LogError("Loi ham khong tim thay a: " + ex.ToString());
-					return result;
 				}
 			}
+			if (result == null && NroWeb.BrowserPlatform.IsBrowser && backgroundPath.StartsWith("/bg/", StringComparison.Ordinal))
+			{
+				try
+				{
+					Image background = Image.createImage(cutPng(Main.res + "/x1" + backgroundPath));
+					// Resize into an owned texture; Resources textures are shared by both tabs.
+					if (mGraphics.zoomLevel != 1)
+					{
+						background.texture = Resize(background.texture, background.w * mGraphics.zoomLevel, background.h * mGraphics.zoomLevel);
+						background.w = background.texture.width;
+						background.h = background.texture.height;
+						Image.setTextureQuality(background.texture);
+					}
+					result = background;
+				}
+				catch (Exception) { }
+			}
+			return result;
 		}
 
 		public static Image LoadImageFromRoot(string path)

@@ -1875,6 +1875,8 @@ namespace Game1
 			catch (Exception)
 			{
 				isLoadBGok = false;
+				TileMap.lastBgID = -1;
+				TileMap.lastType = -1;
 			}
 		}
 
@@ -2521,6 +2523,7 @@ namespace Game1
 
 		public static Image loadImageRMS(string path)
 		{
+			string backgroundPath = path;
 			path = Main.res + "/x" + mGraphics.zoomLevel + path;
 			path = cutPng(path);
 			Image result = null;
@@ -2543,6 +2546,23 @@ namespace Game1
 				{
 					Cout.LogError("Loi ham khong tim thay a: " + ex.ToString());
 				}
+			}
+			if (result == null && NroWeb.BrowserPlatform.IsBrowser && backgroundPath.StartsWith("/bg/", StringComparison.Ordinal))
+			{
+				try
+				{
+					Image background = Image.createImage(cutPng(Main.res + "/x1" + backgroundPath));
+					// Resize into an owned texture; Resources textures are shared by both tabs.
+					if (mGraphics.zoomLevel != 1)
+					{
+						background.texture = Resize(background.texture, background.w * mGraphics.zoomLevel, background.h * mGraphics.zoomLevel);
+						background.w = background.texture.width;
+						background.h = background.texture.height;
+						Image.setTextureQuality(background.texture);
+					}
+					result = background;
+				}
+				catch (Exception) { }
 			}
 			return result;
 		}
