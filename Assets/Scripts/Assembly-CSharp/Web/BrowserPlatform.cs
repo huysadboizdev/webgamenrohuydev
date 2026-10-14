@@ -56,7 +56,7 @@ namespace NroWeb
 #if UNITY_WEBGL && !UNITY_EDITOR
                 return NroServerList();
 #else
-                return "NRO NGU:127.0.0.1:14445:0,0,0";
+                return "NRO NGU:160.191.245.239:14445:0,0,0";
 #endif
             }
         }
