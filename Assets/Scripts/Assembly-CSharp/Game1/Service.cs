@@ -408,6 +408,7 @@ namespace Game1
 			Cout.println("USE ITEM! " + type);
 			if (Char.myCharz().statusMe == 14)
 			{
+				GameCanvas.startOKDlg(mResources.can_not_do_when_die);
 				return;
 			}
 			Message message = null;
