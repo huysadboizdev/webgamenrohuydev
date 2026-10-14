@@ -7,6 +7,9 @@ using UnityEngine;
 
 public static class PcClientBuild
 {
+    public const string ProductName = "NROBEAR";
+    public const string IconPath = "Assets/Editor/AppIcon/nrobear-icon.png";
+
     // Manual entry point only. Source installation never invokes this method.
     // Builds the local Windows standalone client. Does not touch WebGL settings or output.
     [MenuItem("NRO PC/Build local two-tab PC client")]
@@ -17,8 +20,10 @@ public static class PcClientBuild
             throw new Exception("PRJ requires both native account scenes");
         string configured = Environment.GetEnvironmentVariable("NRO_PC_BUILD_OUTPUT");
         string output = Path.GetFullPath(string.IsNullOrEmpty(configured)
-            ? Path.Combine(Application.dataPath, "../Builds/PC/NRO-TwoTab-PC.exe") : configured);
+            ? Path.Combine(Application.dataPath, "../Builds/PC/NROBEAR.exe") : configured);
+        PlayerSettings.productName = ProductName;
         PlayerSettings.SetScriptingBackend(BuildTargetGroup.Standalone, ScriptingImplementation.Mono2x);
+        SetAppIcon(BuildTargetGroup.Standalone);
         Directory.CreateDirectory(Path.GetDirectoryName(output));
         var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions {
             scenes = scenes, locationPathName = output, target = BuildTarget.StandaloneWindows64, options = BuildOptions.None
@@ -26,5 +31,12 @@ public static class PcClientBuild
         string result = "Result=" + report.summary.result + "\nErrors=" + report.summary.totalErrors + "\nWarnings=" + report.summary.totalWarnings;
         File.WriteAllText(Path.Combine(Path.GetDirectoryName(output), "build-result.txt"), result);
         if (report.summary.result != BuildResult.Succeeded) throw new Exception(result);
+    }
+
+    public static void SetAppIcon(BuildTargetGroup group)
+    {
+        var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath);
+        if (icon == null) throw new Exception("Missing app icon at " + IconPath);
+        PlayerSettings.SetIconsForTargetGroup(group, new[] { icon });
     }
 }
