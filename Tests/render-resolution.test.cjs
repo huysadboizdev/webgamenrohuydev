@@ -14,11 +14,11 @@ for(const file of ['Assets/WebGLTemplates/NroWeb/index.html','Builds/WebGL/index
  }
  for(const [device,width,height] of [['android',390,780],['android',844,390],['ios',844,390]]){
   test(`${file}: ${device} uses mobile viewport`,()=>{
-   const c={device,view:{clientWidth:width,clientHeight:height},canvas:{style:{}},Math};vm.runInNewContext(resize+';resize();',c);
-   assert(c.canvas.width<=1024&&c.canvas.height<=768);assert(c.canvas.width>0&&c.canvas.height>0);
+   const c={device,view:{clientWidth:width,clientHeight:height},canvas:{style:{}},window:{devicePixelRatio:2},Math};vm.runInNewContext(resize+';resize();',c);
+   assert.equal(c.canvas.width,width*2);assert.equal(c.canvas.height,height*2);
    assert.equal(c.canvas.style.width,'100%');assert.equal(c.canvas.style.height,'100%');
    assert(Math.abs(c.canvas.width/c.canvas.height-width/height)<.01);
   });
  }
- test(`${file}: browser pixel ratio cannot magnify the canvas`,()=>assert(html.includes('matchWebGLToCanvasSize:false')&&html.includes('devicePixelRatio:1')));
+ test(`${file}: Unity does not multiply the manually selected platform pixel density`,()=>assert(html.includes('matchWebGLToCanvasSize:false')&&html.includes('devicePixelRatio:1')));
 }

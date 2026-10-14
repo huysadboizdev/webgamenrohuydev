@@ -82,7 +82,8 @@ namespace Game2
 				Command command = (Command)vecServer.elementAt(i);
 				if (command != null)
 				{
-					int x = GameCanvas.hw - numw * (wc + w2c) / 2 + i % numw * (wc + w2c);
+					int gridWidth = numw * (wc + w2c) - (NroWeb.BrowserPlatform.IsBrowser ? w2c : 0);
+					int x = GameCanvas.hw - gridWidth / 2 + i % numw * (wc + w2c);
 					int y = GameCanvas.hh - numh * (hc + w2c) / 2 + i / numw * (hc + w2c);
 					command.x = x;
 					command.y = y;

@@ -8,11 +8,11 @@
   <title>NRO hai tài khoản</title>
   <style>
     *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#151a20;color:#fff;font:14px system-ui}
-    #game{height:100%;display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+    #game{position:fixed;left:0;top:0;width:100%;height:100%;display:flex;flex-direction:column;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
     button{border:0;border-radius:5px;padding:8px 14px;background:#3d4a5a;color:white;cursor:pointer}
     #view{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center}canvas{display:block;max-width:100%;max-height:100%;outline:none;touch-action:none}#status{position:absolute;text-align:center;max-width:90%}
-    #keyboard{display:none;position:fixed;left:4%;right:4%;bottom:16px;z-index:10;background:#252d38;padding:12px;border-radius:8px;gap:8px}#keyboard input{min-width:0;flex:1;font-size:18px;padding:10px}body.mobile button{padding:6px 10px}
-    #rotate-device{position:absolute;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:#151a20;gap:16px}#rotate-device[hidden]{display:none}#rotate-device .rotate-icon{font-size:64px;line-height:1}#rotate-device strong{font-size:22px;max-width:360px}#rotate-device p{margin:0;color:#b3c1cd;max-width:360px}#game{position:relative}body.portrait-blocked #view,body.portrait-blocked #keyboard{visibility:hidden}
+    #keyboard{display:none;position:absolute;left:4%;right:4%;bottom:16px;z-index:10;background:#252d38;padding:12px;border-radius:8px;gap:8px}#keyboard input{min-width:0;flex:1;font-size:18px;padding:10px}body.mobile button{padding:6px 10px}
+    #rotate-device{position:absolute;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:#151a20;gap:16px}#rotate-device[hidden]{display:none}#rotate-device .rotate-icon{font-size:64px;line-height:1}#rotate-device strong{font-size:22px;max-width:360px}#rotate-device p{margin:0;color:#b3c1cd;max-width:360px}body.portrait-blocked #view,body.portrait-blocked #keyboard{visibility:hidden}
   </style>
 </head>
 <body>
@@ -23,6 +23,9 @@
   var device = NroDevice.classify(navigator);
   document.body.classList.toggle('mobile',device !== 'pc');
   var canvas = document.getElementById('unity-canvas'), view = document.getElementById('view'), statusEl = document.getElementById('status');
+  var game = document.getElementById('game');
+  function syncViewport(){var visible=window.visualViewport;game.style.width=Math.max(1,visible?visible.width:window.innerWidth)+'px';game.style.height=Math.max(1,visible?visible.height:window.innerHeight)+'px';game.style.left=(visible?visible.offsetLeft:0)+'px';game.style.top=(visible?visible.offsetTop:0)+'px';}
+  window.addEventListener('resize',syncViewport);if(window.visualViewport){window.visualViewport.addEventListener('resize',syncViewport);window.visualViewport.addEventListener('scroll',syncViewport);}syncViewport();
   var gameInstance = null;
   var rotateMessage = document.createElement('div');rotateMessage.id='rotate-device';rotateMessage.hidden=true;rotateMessage.setAttribute('role','status');rotateMessage.setAttribute('aria-live','polite');rotateMessage.innerHTML='<span class="rotate-icon" aria-hidden="true">↻</span><strong>Vui lòng xoay ngang thiết bị để chơi</strong><p>Game sẽ hiển thị khi màn hình nằm ngang.</p>';document.getElementById('game').appendChild(rotateMessage);
   function updateOrientation(){var blocked=device!=='pc'&&window.innerHeight>window.innerWidth;document.body.classList.toggle('portrait-blocked',blocked);rotateMessage.hidden=!blocked;[view,document.getElementById('keyboard')].forEach(function(el){el.inert=blocked;});if(blocked&&document.activeElement&&document.activeElement!==document.body)document.activeElement.blur();}
@@ -38,7 +41,7 @@
   // user gesture required by iOS when that deferred focus cannot open its keyboard.
   document.getElementById('open-keyboard').addEventListener('click',function(){if(inputState===1){textInput.blur();textInput.focus();}});
   document.addEventListener('paste',function(event){if(document.body.classList.contains('portrait-blocked')||document.activeElement===textInput)return;var text=event.clipboardData.getData('text');if(gameInstance){gameInstance.SendMessage('BrowserHost','Paste',text);event.preventDefault();}});
-  function resize(){var width=Math.max(1,view.clientWidth),height=Math.max(1,view.clientHeight);if(device==='pc'){var fit=Math.min(1,width/1024,height/600);canvas.style.width=(1024*fit)+'px';canvas.style.height=(600*fit)+'px';canvas.width=1024;canvas.height=600;return;}var scale=Math.min(1,1024/width,768/height);canvas.style.width='100%';canvas.style.height='100%';canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));}
+  function resize(){var width=Math.max(1,view.clientWidth),height=Math.max(1,view.clientHeight);if(device==='pc'){var fit=Math.min(1,width/1024,height/600);canvas.style.width=(1024*fit)+'px';canvas.style.height=(600*fit)+'px';canvas.width=1024;canvas.height=600;return;}var density=Math.max(1,window.devicePixelRatio||1);canvas.style.width='100%';canvas.style.height='100%';canvas.width=Math.max(1,Math.round(width*density));canvas.height=Math.max(1,Math.round(height*density));}
   new ResizeObserver(resize).observe(view);resize();
   window.NroTabs={current:0,changed:function(index){this.current=index;NroInput.close();}};
   var config={dataUrl:'Build/{{{ DATA_FILENAME }}}',frameworkUrl:'Build/{{{ FRAMEWORK_FILENAME }}}',codeUrl:'Build/{{{ CODE_FILENAME }}}',streamingAssetsUrl:'StreamingAssets',companyName:{{{ JSON.stringify(COMPANY_NAME) }}},productName:{{{ JSON.stringify(PRODUCT_NAME) }}},productVersion:{{{ JSON.stringify(PRODUCT_VERSION) }}},matchWebGLToCanvasSize:false,devicePixelRatio:1};

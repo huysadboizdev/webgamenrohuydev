@@ -257,6 +257,8 @@ namespace Game1
 				cmd[i].x = (GameCanvas.w - cmd[i].w) / 2;
 				num += 30;
 			}
+			if (NroWeb.BrowserPlatform.IsBrowser)
+				ResizeBrowser();
 		}
 
 		public void ResizeBrowser()

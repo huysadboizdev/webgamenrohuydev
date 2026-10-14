@@ -10,6 +10,7 @@ def method(s,signature,missing=''):
   end+=1
  return s[start:end]
 stub='''using System;using System.Collections.Generic;
+namespace NroWeb {public static class BrowserPlatform {public static bool IsBrowser=true;} }
 namespace GAME {
 public class Command {public int x,y,w=76,h=24;}
 public static class GameCanvas {public static int w,h,hw,hh;public static bool isTouch=true;}
