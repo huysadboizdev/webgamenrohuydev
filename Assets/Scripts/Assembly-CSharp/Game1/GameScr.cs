@@ -4076,7 +4076,7 @@ public void RemoveAllItem()
 				for (int i = 0; i < ModFunc.bossNotif.size(); i++)
 				{
 					ShowBoss showBoss = (ShowBoss)ModFunc.bossNotif.elementAt(i);
-					if (showBoss != null)
+					if (showBoss != null && showBoss.ShouldShowOnScreen())
 					{
 						if (GameCanvas.isPointerHoldIn(GameCanvas.w - 5 - showBoss.stringLength, num + 3, showBoss.stringLength, 10) && GameCanvas.isPointerClick && GameCanvas.isPointerJustRelease)
 						{
@@ -6807,7 +6807,11 @@ public void RemoveAllItem()
 				isFireWorks = true;
 			}
 			vChatVip.addElement(chatVip);
-			if (chatVip.Trim().ToLower().Contains("boss") && chatVip.Trim().ToLower().Contains("xuất hiện"))
+			ShowBoss.HandleChatVip(chatVip);
+			// Legacy fallback: with an old server (no command 115) the overlay would
+			// stay empty, so a boss-appear ticker also feeds the panel as visible.
+			// A typed 115 event arriving for the same ticker replaces this entry.
+			if (chatVip.StartsWith("BOSS ") && !hasBossNotifTicker(chatVip))
 			{
 				ModFunc.bossNotif.addElement(new ShowBoss(chatVip));
 				if (ModFunc.bossNotif.size() > 5)
@@ -6815,7 +6819,41 @@ public void RemoveAllItem()
 					ModFunc.bossNotif.removeElementAt(0);
 				}
 			}
-			ShowBoss.HandleChatVip(chatVip);
+		}
+
+		private bool hasBossNotifTicker(string ticker)
+		{
+			for (int i = 0; i < ModFunc.bossNotif.size(); i++)
+			{
+				ShowBoss entry = (ShowBoss)ModFunc.bossNotif.elementAt(i);
+				if (entry.rawTicker != null && entry.rawTicker.Equals(ticker))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		private void removeLegacyBossNotifTicker(string ticker)
+		{
+			for (int i = ModFunc.bossNotif.size() - 1; i >= 0; i--)
+			{
+				ShowBoss entry = (ShowBoss)ModFunc.bossNotif.elementAt(i);
+				if (!entry.HasScreenIdentity() && entry.rawTicker != null && entry.rawTicker.Equals(ticker))
+				{
+					ModFunc.bossNotif.removeElementAt(i);
+				}
+			}
+		}
+
+		public void showBossScreenNotice(string eventKey, int semanticBossId, int form, int mapId, int mapType, string ticker)
+		{
+			removeLegacyBossNotifTicker(ticker);
+			ModFunc.bossNotif.addElement(new ShowBoss(ticker, eventKey, semanticBossId, form, mapId, mapType));
+			if (ModFunc.bossNotif.size() > 5)
+			{
+				ModFunc.bossNotif.removeElementAt(0);
+			}
 		}
 
 		public void paintChatVip(mGraphics g)

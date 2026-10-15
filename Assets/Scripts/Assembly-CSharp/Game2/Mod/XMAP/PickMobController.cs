@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace Game2.Mod.XMAP
 {
@@ -93,37 +93,25 @@ namespace Game2.Mod.XMAP
 					@char.mobFocus = null;
 				}
                 if (@char.mobFocus == null) @char.mobFocus = GetMobTanSat();
-                if (@char.mobFocus != null && @char.skillInfoPaint() == null)
+                if (CanStartMassacreSkill(@char))
                 {
                     Skill skillAttack = GetSkillAttack();
                     Mob target = @char.mobFocus;
-                    if (skillAttack != null)
+                    bool needsTarget = skillAttack != null && !skillAttack.template.isBuffToPlayer() && !skillAttack.template.isUseAlone();
+                    if (skillAttack != null && (!needsTarget || target != null))
                     {
-                        if (Res.distance(target.xFirst, target.yFirst, @char.cx, @char.cy) > 48)
+                        if (needsTarget && !IsWithinMassacreSkillRange(skillAttack, target.getX(), target.getY(), @char.cx, @char.cy))
                         {
-                            if (PickMob.telePem) TryMoveForAutoAttack(target.xFirst, target.yFirst);
-                            else Move(target.xFirst, target.yFirst);
+                            int approachX = GetMassacreApproachX(skillAttack, target.getX(), @char.cx);
+                            if (PickMob.telePem) TryMoveForAutoAttack(approachX, target.getY());
+                            else Move(approachX, target.getY());
                             Wait(100);
                             return;
                         }
-                        if (!EnsurePositionSent()) return;
-                        if (GameScr.gI().TrySelectSkillForAutoCombat(skillAttack))
-                        {
-                            if (skillAttack.template.isAttackSkill())
-                            {
-                                MyVector mobs = new MyVector();
-                                mobs.addElement(target);
-                                if (Service.gI().TrySendPlayerAttack(mobs, new MyVector(), 1))
-                                    ModFunc.GI().SetUsedSkill(skillAttack);
-                            }
-                            else if (skillAttack.template.isUseAlone())
-                            {
-                                ModFunc.GI().DoDoubleClickToObj(target);
-                            }
-                        }
+                        TryUseMassacreSkill(skillAttack, target, null);
                     }
                 }
-				else if (!flag)
+                if (@char.mobFocus == null && !flag)
 				{
 					Mob mobNext = GetMobNext();
 					if (mobNext != null)
@@ -174,29 +162,25 @@ namespace Game2.Mod.XMAP
                         return;
 					}
 				}
-				if (@char.charFocus != null && @char.skillInfoPaint() == null)
+				if (CanStartMassacreSkill(@char))
 				{
 					Skill skillAttack2 = GetSkillAttack();
-					if (skillAttack2 != null && CanUseSkill(skillAttack2))
+					bool needsTarget = skillAttack2 != null && !skillAttack2.template.isBuffToPlayer() && !skillAttack2.template.isUseAlone();
+					if (skillAttack2 != null && (!needsTarget || @char.charFocus != null))
 					{
 						Char charFocus = @char.charFocus;
-                        if (!EnsurePositionSent() || !GameScr.gI().TrySelectSkillForAutoCombat(skillAttack2)) return;
-						if (Res.distance(charFocus.cx, charFocus.cy, @char.cx, @char.cy) <= 48)
+						if (needsTarget && !IsWithinMassacreSkillRange(skillAttack2, charFocus.cx, charFocus.cy, @char.cx, @char.cy))
 						{
-							ModFunc.GI().DoDoubleClickToObj(charFocus);
-						}
-						else
-						{
+							int approachX = GetMassacreApproachX(skillAttack2, charFocus.cx, @char.cx);
 							if (PickMob.telePem)
 							{
-								if (Math.abs(charFocus.cx - @char.cx) >= 20 || Math.abs(charFocus.cy - @char.cy) >= 20)
-								{
-									TryMoveForAutoAttack(charFocus.cx, charFocus.cy);
-								}
+								TryMoveForAutoAttack(approachX, charFocus.cy);
 								return;
 							}
-							Move(charFocus.cx, charFocus.cy);
+							Move(approachX, charFocus.cy);
+							return;
 						}
+						TryUseMassacreSkill(skillAttack2, null, charFocus);
 					}
 				}
 				Wait(100);
@@ -212,6 +196,24 @@ namespace Game2.Mod.XMAP
                 && !player.isTeleport && !player.telePortSkill && !player.isCreateDark
                 && !player.isCharge && !player.isStandAndCharge && !player.isFlyAndCharge
                 && !player.isUseSkillAfterCharge && !player.isWaitMonkey;
+        }
+
+        private static bool CanStartMassacreSkill(Char player)
+        {
+            SkillInfoPaint[] animation = player.skillInfoPaint();
+            return animation == null || player.indexSkill >= animation.Length;
+        }
+
+        private static bool IsWithinMassacreSkillRange(Skill skill, int targetX, int targetY, int playerX, int playerY)
+        {
+            return skill != null && Math.abs(targetX - playerX) <= skill.dx
+                && Math.abs(targetY - playerY) <= skill.dy;
+        }
+
+        private static int GetMassacreApproachX(Skill skill, int targetX, int playerX)
+        {
+            int offset = System.Math.Max(0, skill.dx - 20);
+            return targetX + ((playerX > targetX) ? offset : -offset);
         }
 
         private static bool TryMoveForAutoAttack(int x, int y)
@@ -411,20 +413,87 @@ namespace Game2.Mod.XMAP
 			return false;
 		}
 
+		private static int massacreSkillCursor;
+
+		private static bool IsExcludedMassacreSkill(Skill skill)
+		{
+			if (skill == null || skill.template == null)
+			{
+				return true;
+			}
+			return skill.template.id == 7 || skill.template.id == 10 || skill.template.id == 11 || skill.template.id == 14;
+		}
+
+		private static int NextMassacreSkillCursor(int current, int count)
+		{
+			if (count <= 0) return 0;
+			return (current + 1) % count;
+		}
+
 		private static Skill GetSkillAttack()
 		{
-			Skill skill = null;
-			SkillTemplate skillTemplate = new SkillTemplate();
-			foreach (sbyte item in PickMob.IdSkillsTanSat)
+			Char player = Char.myCharz();
+			int count = player.vSkill.size();
+			if (count == 0) return null;
+			int start = massacreSkillCursor % count;
+			for (int offset = 0; offset < count; offset++)
 			{
-				sbyte b = (skillTemplate.id = item);
-				Skill skill2 = Char.myCharz().getSkill(skillTemplate);
-				if (IsSkillBetter(skill2, skill))
+				int index = (start + offset) % count;
+				Skill skill = (Skill)player.vSkill.elementAt(index);
+				if (!IsExcludedMassacreSkill(skill) && skill.template.type >= 1 && skill.template.type <= 4 && CanUseSkill(skill))
 				{
-					skill = skill2;
+					return skill;
 				}
 			}
-			return skill;
+			return null;
+		}
+
+		private static void AdvanceMassacreSkillCursor(Skill usedSkill)
+		{
+			Char player = Char.myCharz();
+			int count = player.vSkill.size();
+			for (int index = 0; index < count; index++)
+			{
+				if (player.vSkill.elementAt(index) == usedSkill)
+				{
+					massacreSkillCursor = NextMassacreSkillCursor(index, count);
+					return;
+				}
+			}
+		}
+
+		private static bool TryUseMassacreSkill(Skill skill, Mob targetMob, Char targetChar)
+		{
+			if (skill == null || IsExcludedMassacreSkill(skill) || !CanUseSkill(skill)) return false;
+			Char player = Char.myCharz();
+			if (!skill.template.isBuffToPlayer() && !skill.template.isUseAlone() && targetMob == null && targetChar == null) return false;
+			if (!EnsurePositionSent() || !GameScr.gI().TrySelectSkillForAutoCombat(skill)) return false;
+			bool used;
+			if (skill.template.isBuffToPlayer())
+			{
+				MyVector targetPlayers = new MyVector();
+				targetPlayers.addElement(player);
+				used = Service.gI().TrySendPlayerAttack(new MyVector(), targetPlayers, 2);
+			}
+			else if (skill.template.isUseAlone())
+			{
+				player.useSkillNotFocus();
+				used = true;
+			}
+			else
+			{
+				MyVector targetMobs = new MyVector();
+				MyVector targetPlayers = new MyVector();
+				if (targetMob != null) targetMobs.addElement(targetMob);
+				if (targetChar != null) targetPlayers.addElement(targetChar);
+				used = Service.gI().TrySendPlayerAttack(targetMobs, targetPlayers, (targetChar == null) ? 1 : 2);
+			}
+			if (used)
+			{
+				AdvanceMassacreSkillCursor(skill);
+				ModFunc.GI().SetUsedSkill(skill);
+			}
+			return used;
 		}
 
 		private static Skill GetSkillAttack2()

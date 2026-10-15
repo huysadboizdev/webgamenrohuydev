@@ -1435,6 +1435,10 @@ public void CollectAllThuongDe()
 				for (int j = 0; j < bossNotif.size(); j++)
 				{
 					ShowBoss showBoss = (ShowBoss)bossNotif.elementAt(j);
+					if (showBoss == null || !showBoss.ShouldShowOnScreen())
+					{
+						continue;
+					}
 					showBoss.PaintBoss(g, GameCanvas.w - 5, num3);
 					if (showBoss.stringLength > num4)
 					{

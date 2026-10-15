@@ -5,6 +5,43 @@ namespace Game2.Assets.src.f
 {
 	internal class Controller2
 	{
+		private static BossScreenNoticeData.BossScreenEvent ReadBossScreenEvent(myReader reader)
+		{
+			if (reader.available() < 2)
+			{
+				return null;
+			}
+			reader.mark(reader.available());
+			try
+			{
+				sbyte schema = reader.readByte();
+				sbyte version = reader.readByte();
+				if (schema != BossScreenNoticeData.ScreenSchema || version != BossScreenNoticeData.ScreenVersion)
+				{
+					reader.reset();
+					return null;
+				}
+				string eventKey = reader.readUTF();
+				int semanticBossId = reader.readInt();
+				int form = reader.readInt();
+				int mapId = reader.readInt();
+				int mapType = reader.readInt();
+				string ticker = reader.readUTF();
+				return new BossScreenNoticeData.BossScreenEvent(eventKey, semanticBossId, form, mapId, mapType, ticker);
+			}
+			catch (Exception)
+			{
+				try
+				{
+					reader.reset();
+				}
+				catch (Exception)
+				{
+				}
+				return null;
+			}
+		}
+
 		public static void readMessage(Message msg)
 		{
 			try
@@ -712,6 +749,15 @@ namespace Game2.Assets.src.f
 					string str = msg.reader().readUTF();
 					str = Res.changeString(str);
 					GameScr.gI().chatVip(str);
+					break;
+				}
+				case 115:
+				{
+					BossScreenNoticeData.BossScreenEvent bossScreenEvent = ReadBossScreenEvent(msg.reader());
+					if (bossScreenEvent != null)
+					{
+						GameScr.gI().showBossScreenNotice(bossScreenEvent.eventKey, bossScreenEvent.semanticBossId, bossScreenEvent.form, bossScreenEvent.mapId, bossScreenEvent.mapType, bossScreenEvent.ticker);
+					}
 					break;
 				}
 				case 98:

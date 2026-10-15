@@ -4878,6 +4878,11 @@ namespace Game1
 			isMabuHold = m;
 		}
 
+		private static bool ShouldSuppressOwnSkillAnimation(bool isOwnCharacter)
+		{
+			return isOwnCharacter && (Game1.Mod.XMAP.PickMob.tanSat || Game1.Mod.XMAP.PickMob.tsPlayer);
+		}
+
 		public virtual void paint(mGraphics g)
 		{
 			if (ModFunc.AnPlayer || isHide)
@@ -4959,15 +4964,19 @@ namespace Game1
 				else if (statusMe != 15 && (moveFast == null || moveFast[0] <= 0))
 				{
 					PaintCharName_HP_MP_Overhead(g);
-					if (skillPaint == null || skillInfoPaint() == null || indexSkill >= skillInfoPaint().Length)
+					bool hideOwnSkillAnimation = ShouldSuppressOwnSkillAnimation(me);
+					if (hideOwnSkillAnimation || skillPaint == null || skillInfoPaint() == null || indexSkill >= skillInfoPaint().Length)
 					{
+						int skillFrame = cf;
+						if (hideOwnSkillAnimation && (skillPaint != null || isPaintNewSkill)) cf = 0;
 						paintCharWithoutSkill(g);
+						cf = skillFrame;
 					}
-					if (arr != null)
+					if (!hideOwnSkillAnimation && arr != null)
 					{
 						arr.paint(g);
 					}
-					if (dart != null)
+					if (!hideOwnSkillAnimation && dart != null)
 					{
 						dart.paint(g);
 					}
@@ -5727,8 +5736,16 @@ namespace Game1
 
 		public void paintCharWithSkill(mGraphics g)
 		{
-			ty = 0;
 			SkillInfoPaint[] array = skillInfoPaint();
+			if (ShouldSuppressOwnSkillAnimation(me))
+			{
+				if (array != null && indexSkill >= 0 && indexSkill < array.Length)
+				{
+					indexSkill = array.Length;
+				}
+				return;
+			}
+			ty = 0;
 			cf = array[indexSkill].status;
 			paintCharWithoutSkill(g);
 			if (cdir == 1)

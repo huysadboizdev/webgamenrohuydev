@@ -38,8 +38,32 @@ namespace Game2.Mod
 
 		public int stringLength;
 
+		public bool hiddenFromScreenPanel;
+
+		/// <summary>Original ticker text. Used to match a legacy 93 entry with its typed 115 event.</summary>
+		public string rawTicker;
+
+		private bool hasScreenIdentity;
+
+		public readonly string screenEventKey;
+
+		private int screenSemanticBossId;
+
+		public readonly int screenForm;
+
+		private int screenMapId;
+
+		private int screenMapType;
+
 		public ShowBoss(string text)
+			: this(text, false)
 		{
+		}
+
+		public ShowBoss(string text, bool hiddenFromScreenPanel)
+		{
+			this.hiddenFromScreenPanel = hiddenFromScreenPanel;
+			this.rawTicker = text;
 			text = text.Replace(text.Substring(0, 5), "|");
 			text = text.Replace(" vừa xuất hiện tại", "|");
 			text = text.Replace(" khu vực", "|");
@@ -48,6 +72,31 @@ namespace Game2.Mod
 			mapName = array[2].Trim();
 			mapID = ModFunc.GI().GetMapID(mapName);
 			time = DateTime.Now.Ticks;
+		}
+
+		public ShowBoss(string tickerText, string eventKey, int semanticBossId, int form, int mapId, int mapType)
+			: this(tickerText, false)
+		{
+			hasScreenIdentity = true;
+			screenEventKey = eventKey;
+			screenSemanticBossId = semanticBossId;
+			screenForm = form;
+			screenMapId = mapId;
+			screenMapType = mapType;
+		}
+
+		public bool HasScreenIdentity()
+		{
+			return hasScreenIdentity;
+		}
+
+		public bool ShouldShowOnScreen()
+		{
+			if (hasScreenIdentity)
+			{
+				return BossScreenNoticeData.ShouldShow(screenSemanticBossId, screenMapId, screenMapType);
+			}
+			return !hiddenFromScreenPanel;
 		}
 
 		public static void HandleChatVip(string chatVip)

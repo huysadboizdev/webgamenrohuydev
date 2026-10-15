@@ -18,6 +18,15 @@ const {once}=require('node:events'),fs=require('node:fs'),path=require('node:pat
    const page=await context.newPage(),logs=[],errors=[],dialogs=[];
    page.on('console',m=>logs.push(m.text()));page.on('pageerror',e=>errors.push(String(e)));page.on('dialog',async d=>{dialogs.push(d.message());await d.accept();});
    await page.goto('http://127.0.0.1:'+server.address().port);
+   if(mobile&&options.viewport.height>options.viewport.width){
+    await expect(page.locator('#rotate-device')).toBeVisible();
+    const landscape=sizes.find(([width,height])=>width>height);
+    if(!landscape)throw new Error('Mobile profile requires a landscape startup viewport');
+    await page.setViewportSize({width:landscape[0],height:landscape[1]});
+    await page.waitForFunction(()=>window.innerWidth>=window.innerHeight&&!document.body.classList.contains('portrait-blocked'));
+   }
+   const later=page.locator('#nro-fullscreen-prompt [data-fullscreen-action="later"]');
+   if(await later.isVisible())await later.click();
    await page.waitForFunction(()=>window.gameInstance!==null,{},{timeout:180000});
    const flags='pc='+(mobile?'False':'True')+' mobile='+(mobile?'True':'False');
    await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game1 '+flags)),{timeout:30000}).toBe(true);
@@ -25,6 +34,8 @@ const {once}=require('node:events'),fs=require('node:fs'),path=require('node:pat
    await page.evaluate(()=>gameInstance.SendMessage('BrowserHost','SelectTab','1'));await expect.poll(()=>logs.some(s=>s.includes('NRO_WEB_DEVICE Game2 '+flags))).toBe(true);
    for(const [width,height] of sizes){
     await page.setViewportSize({width,height});
+    await page.waitForFunction(({width,height})=>window.innerWidth===width&&window.innerHeight===height,{width,height});
+    if(mobile)await page.waitForFunction(()=>document.querySelector('#rotate-device').hidden===(window.innerWidth>=window.innerHeight));
     if(mobile&&height>width){await expect(page.locator('#rotate-device')).toBeVisible();await page.screenshot({path:path.join(output,'responsive-'+name+'-'+width+'x'+height+'-rotate.png')});results.push({name,width,height,mobile,rotationRequired:true});continue;}
     await expect(page.locator('#rotate-device')).toBeHidden();
     for(const tab of [1,2]){
