@@ -40,3 +40,36 @@ test('static hosting exposes build only, traversals rejected', async(t)=>{
   assert.equal((await fetch(url+'/client.wasm')).headers.get('content-type'),'application/wasm');
   assert.equal((await fetch(url+'/%2e%2e%2fserver.cjs')).status,403);
 });
+
+test('static files provide validators for Unity cache revalidation', async(t)=>{
+  const dir=fs.mkdtempSync(require('node:path').join(require('node:os').tmpdir(),'nro-cache-test-'));
+  fs.writeFileSync(dir+'/client.data',Buffer.from([1,2,3,4]));
+  fs.mkdirSync(dir+'/Build');
+  fs.writeFileSync(dir+'/Build/WebGL-release-20261015.data',Buffer.from([5,6,7,8]));
+  fs.writeFileSync(dir+'/index.html','game');
+  const g=api.createGateway({root:dir});g.listen(0,'127.0.0.1');await once(g,'listening');
+  t.after(async()=>{await g.shutdown();fs.rmSync(dir,{recursive:true,force:true});});
+  const url='http://127.0.0.1:'+g.address().port+'/client.data';
+  const first=await fetch(url);
+  const etag=first.headers.get('etag');
+  const lastModified=first.headers.get('last-modified');
+  assert.ok(etag,'GET should expose an ETag');
+  assert.ok(lastModified,'GET should expose Last-Modified');
+  assert.deepEqual(Buffer.from(await first.arrayBuffer()),Buffer.from([1,2,3,4]));
+
+  const head=await fetch(url,{method:'HEAD'});
+  assert.equal(head.status,200);
+  assert.equal(head.headers.get('etag'),etag);
+  assert.equal(head.headers.get('last-modified'),lastModified);
+  assert.equal(head.headers.get('content-length'),'4');
+
+  const unchanged=await fetch(url,{headers:{'If-None-Match':etag}});
+  assert.equal(unchanged.status,304,'unchanged cached content should revalidate without downloading its body');
+  assert.equal(unchanged.headers.get('etag'),etag);
+  assert.equal(unchanged.headers.get('content-length'),null);
+
+  const versionedAsset=await fetch(url.replace('/client.data','/Build/WebGL-release-20261015.data'));
+  assert.equal(versionedAsset.headers.get('cache-control'),'public, max-age=31536000, immutable');
+  const html=await fetch(url.replace('/client.data','/index.html'));
+  assert.equal(html.headers.get('cache-control'),'no-cache','the shell must revalidate to discover each new build');
+});

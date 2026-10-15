@@ -18,7 +18,16 @@ function createGateway(options = {}) {
     if (!file.startsWith(root+path.sep) || pathname.includes('\\') || pathname.includes('\0')) {res.writeHead(403);res.end();return;}
     fs.stat(file,(error,stat) => {
       if(error || !stat.isFile()){res.writeHead(404);res.end('Build WebGL first, then run Gateway/run-web.cmd.');return;}
-      res.writeHead(200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Content-Length':stat.size,'Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'});
+      const lastModified=stat.mtime.toUTCString();
+      const etag=`W/"${stat.size.toString(16)}-${Math.trunc(stat.mtimeMs*1000).toString(16)}"`;
+      const versionedBuildAsset=pathname.startsWith('/Build/') && /^WebGL-[\w-]+-\d{8}\.(?:data|framework\.js|loader\.js|wasm)$/.test(path.basename(file));
+      const headers={'Content-Type':mime[path.extname(file)]||'application/octet-stream','Content-Length':stat.size,'Cache-Control':versionedBuildAsset?'public, max-age=31536000, immutable':'no-cache','ETag':etag,'Last-Modified':lastModified,'X-Content-Type-Options':'nosniff'};
+      const ifNoneMatch=req.headers['if-none-match'];
+      const matchesEtag=ifNoneMatch && (ifNoneMatch.trim()==='*' || ifNoneMatch.split(',').some(value=>value.trim().replace(/^W\//,'')===etag.replace(/^W\//,'')));
+      const ifModifiedSince=req.headers['if-modified-since'];
+      const notModified=matchesEtag || (!ifNoneMatch && ifModifiedSince && !Number.isNaN(Date.parse(ifModifiedSince)) && Math.floor(stat.mtimeMs/1000)<=Math.floor(Date.parse(ifModifiedSince)/1000));
+      if(notModified){delete headers['Content-Length'];res.writeHead(304,headers);res.end();return;}
+      res.writeHead(200,headers);
       if(req.method==='HEAD'){res.end();return;}
       const stream=fs.createReadStream(file);stream.on('error',()=>res.destroy());stream.pipe(res);
     });
