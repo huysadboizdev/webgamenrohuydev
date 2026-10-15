@@ -56,6 +56,7 @@ Từ folder project, Windows cần .NET Framework C# compiler và Python 3:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File Tests/Transport/run-transport-tests.ps1
 python Tests/EffectDataChecks.py
+python Tests/MobFrameRecoveryChecks.py
 python Tests/NpcImageRecoveryChecks.py
 python Tests/NpcImageDecodeChecks.py
 python Tests/TabSwitchChecks.py

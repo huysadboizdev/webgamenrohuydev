@@ -1584,7 +1584,30 @@ namespace Game1
 		{
 			if (isGetFr && isTypeNewMod() && arrMobTemplate[templateId].data != null)
 			{
-				frameArr = (int[][])Controller.frameHT_NEWBOSS.get(templateId + string.Empty);
+				int[][] customFrames = Controller.frameHT_NEWBOSS.get(templateId + string.Empty) as int[][];
+				Frame[] spriteFrames = arrMobTemplate[templateId].data.frame;
+				// A truncated template can declare custom animations without supplying
+				// their frame table. Keep the default sequences and retry when data arrives.
+				if (customFrames == null || customFrames.Length < 6 || spriteFrames == null || spriteFrames.Length == 0)
+				{
+					return;
+				}
+				for (int i = 0; i < 6; i++)
+				{
+					if (customFrames[i] == null || customFrames[i].Length == 0)
+					{
+						return;
+					}
+					for (int j = 0; j < customFrames[i].Length; j++)
+					{
+						int frameIndex = customFrames[i][j];
+						if (frameIndex < 0 || frameIndex >= spriteFrames.Length || spriteFrames[frameIndex] == null)
+						{
+							return;
+						}
+					}
+				}
+				frameArr = customFrames;
 				stand = frameArr[0];
 				move = frameArr[1];
 				moveFast = frameArr[2];

@@ -16,7 +16,11 @@ namespace NroWeb
             DontDestroyOnLoad(host);
             Management.IpServer = BrowserPlatform.ServerList;
             // Let the focused HTML field receive typing; canvas focus still receives game keys.
-            WebGLInput.captureAllKeyboardInput = false;
+            // This Unity project does not reference UnityEngine.WebGLModule in its
+            // player script assemblies, so resolve its WebGL-only API at runtime.
+            var webGlInput = System.Type.GetType("UnityEngine.WebGLInput, UnityEngine.WebGLModule");
+            var captureAllKeyboardInput = webGlInput != null ? webGlInput.GetProperty("captureAllKeyboardInput") : null;
+            if (captureAllKeyboardInput != null) captureAllKeyboardInput.SetValue(null, false, null);
             Application.runInBackground = true;
             Time.fixedDeltaTime = 1f / 30f;
 #endif

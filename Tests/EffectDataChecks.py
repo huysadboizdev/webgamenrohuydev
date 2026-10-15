@@ -16,6 +16,13 @@ static void Assert(bool b,string s){if(!b)throw new Exception(s);}
 static int Main(string[] args){try{
 foreach(int id in new[]{62,63,65,70}){var e=new EffectData{ID=id};e.readData(Bytes(args[0]+"/DataEffect_"+id));Assert(e.arrFrame!=null && e.arrFrame.Length>0,"16-bit effect failed: "+id);Assert(e.frame!=null && e.frame.Length>0,"Missing frames");}
 int valid=0;
+// Local mob resources and older packets can end after frames, without an animation sequence.
+var legacyBytes=new sbyte[]{1,0,0,0,24,54,0,1,1,-1,-14,-1,-53,0};
+foreach(bool reader in new[]{false,true}){
+ var legacy=new EffectData();if(reader)legacy.readData(new myReader(legacyBytes));else legacy.readData(legacyBytes);
+ Assert(legacy.frame!=null && legacy.frame.Length==1 && legacy.frame[0].dx[0]==-14 && legacy.frame[0].dy[0]==-53,"Legacy frame-only mob data lost reader="+reader);
+ Assert(legacy.width==24 && legacy.height==54,"Legacy mob bounds changed");
+}
 var coordinates=new EffectData{ID=62};coordinates.readData(Bytes(args[0]+"/DataEffect_62"));Assert(coordinates.imgInfo[0].x0==191 && coordinates.imgInfo[0].y0==65 && coordinates.imgInfo[0].w==12 && coordinates.imgInfo[0].h==31,"Wrong decoded 16-bit coordinates");
 var animated=new EffectData{ID=201};animated.readData(Bytes(args[0]+"/DataEffect_201"));Assert(animated.get(1).Length==100 && animated.get(2).Length==16 && animated.get(2)[0]==2 && animated.get(10).Length==16,"Animation markers changed");
 foreach(var p in System.IO.Directory.GetFiles(args[0],"DataEffect_*")){int id=int.Parse(System.IO.Path.GetFileName(p).Substring(11));if(id>=281&&id<=284)continue;var e=new EffectData{ID=id};if(id==60)e.readDataNewBoss(Bytes(p),2);else e.readData(Bytes(p));Assert(e.arrFrame!=null,"Server effect failed "+id);valid++;}
@@ -24,7 +31,7 @@ for(int n=0;n<input.Length-2;n++){var broken=new sbyte[n];Array.Copy(input,broke
 saved.readData(new sbyte[]{1,0,0,0,1,1,0,1,1,0,0,0,0,100,0,1,0,0});Assert(Object.ReferenceEquals(saved.frame,before),"Invalid sprite replaced valid state");
 Assert(saved.get(-1)!=null,"Negative animation index");saved.paintFrame(new mGraphics(),-1,0,0,0,0);saved.paintFrame(new mGraphics(),9999,0,0,0,0);
 saved.img=new Image();saved.paintFrame(new mGraphics(),-1,0,0,0,0);saved.paintFrame(new mGraphics(),9999,0,0,0,0);
-Console.WriteLine("PASS GAME "+valid+" real server effects, short-coordinate fallback, truncated/invalid data, atomic state and render bounds");return 0;
+Console.WriteLine("PASS GAME "+valid+" real server effects, short-coordinate fallback, truncated/invalid data, atomic state, legacy frame-only mobs and render bounds");return 0;
 }catch(Exception e){Console.Error.WriteLine(e);return 1;}}
 }}
 '''
