@@ -18,7 +18,7 @@
 <body>
 <div id="game"><div id="view"><canvas id="unity-canvas" tabindex="0"></canvas><div id="status">Đang tải game…</div></div>
 <form id="keyboard"><input id="text-input" aria-label="Nhập nội dung" autocomplete="off" spellcheck="false"><button id="open-keyboard" type="button">Mở bàn phím</button><button type="submit">Xong</button></form></div>
-<script src="device.js"></script><script src="fullscreen.js"></script><script src="config.js"></script>
+<script src="device.js"></script><script src="fullscreen.js"></script><script src="config.js"></script><script src="data-cache.js"></script>
 <script>
   var device = NroDevice.classify(navigator);
   document.body.classList.toggle('mobile',device !== 'pc');
@@ -44,7 +44,7 @@
   function resize(){var width=Math.max(1,view.clientWidth),height=Math.max(1,view.clientHeight);if(device==='pc'){var fit=Math.min(1,width/1024,height/600);canvas.style.width=(1024*fit)+'px';canvas.style.height=(600*fit)+'px';canvas.width=1024;canvas.height=600;return;}var density=Math.max(1,window.devicePixelRatio||1);canvas.style.width='100%';canvas.style.height='100%';canvas.width=Math.max(1,Math.round(width*density));canvas.height=Math.max(1,Math.round(height*density));}
   new ResizeObserver(resize).observe(view);resize();
   window.NroTabs={current:0,changed:function(index){this.current=index;NroInput.close();}};
-  var config={dataUrl:'Build/WebGL-boss-screen-filter-20261015.data',frameworkUrl:'Build/WebGL-boss-screen-filter-20261015.framework.js',codeUrl:'Build/WebGL-boss-screen-filter-20261015.wasm',streamingAssetsUrl:'StreamingAssets',companyName:"NRO",productName:"NRO Two Tab Web",productVersion:"1.0",matchWebGLToCanvasSize:false,devicePixelRatio:1};
+  var config={dataUrl:'Build/WebGL-boss-screen-filter-20261015.data',frameworkUrl:'Build/WebGL-boss-screen-filter-20261015.framework.js',codeUrl:'Build/WebGL-boss-screen-filter-20261015.wasm',streamingAssetsUrl:'StreamingAssets',companyName:"NRO",productName:"NRO Two Tab Web",productVersion:"1.0",cachedFetch:NroDataCache.cachedFetch,cacheControl:function(url){if(url===config.dataUrl)return 'immutable';return url.indexOf('.bundle')!==-1?'must-revalidate':'no-store';},matchWebGLToCanvasSize:false,devicePixelRatio:1};
   var bootStarted=false;
   function settleViewport(){return new Promise(function(resolve){requestAnimationFrame(function(){syncViewport();resize();requestAnimationFrame(function(){syncViewport();resize();resolve();});});});}
   function bootGame(){if(bootStarted)return;bootStarted=true;var script=document.createElement('script');script.src='Build/WebGL-boss-screen-filter-20261015.loader.js';script.onload=function(){createUnityInstance(canvas,config,function(progress){statusEl.textContent='Đang tải game '+Math.round(progress*100)+'%';}).then(function(instance){gameInstance=instance;statusEl.style.display='none';canvas.focus();}).catch(function(error){statusEl.textContent='Không tải được game: '+error;});};document.body.appendChild(script);}
