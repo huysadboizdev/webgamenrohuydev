@@ -27,9 +27,12 @@ for(const file of ['Assets/WebGLTemplates/NroWeb/index.html','Builds/WebGL/index
     assert.match(html,/cachedFetch:NroDataCache\.cachedFetch/);
   });
 }
-const loader=fs.readFileSync(path.resolve(__dirname,'../Builds/WebGL/Build/WebGL-boss-screen-filter-20261015.loader.js'),'utf8');
 test('generated Unity loader preserves the configured mobile data cache adapter',()=>{
-  assert.match(loader,/l\.cachedFetch=l\.cachedFetch\|\|\(/);
+  const html=fs.readFileSync(path.resolve(__dirname,'../Builds/WebGL/index.html'),'utf8');
+  const loaderPath=html.match(/script\.src='(Build\/[^']+\.loader\.js)'/);
+  assert.ok(loaderPath,'active WebGL shell must reference a generated loader');
+  const loader=fs.readFileSync(path.resolve(__dirname,'../Builds/WebGL',loaderPath[1]),'utf8');
+  assert.match(loader,/t=l\.companyName&&l\.productName\?l\.cachedFetch:l\.fetchWithProgress/);
 });
 const cacheScriptPath=path.resolve(__dirname,'../Builds/WebGL/data-cache.js');
 const cacheScript=fs.readFileSync(cacheScriptPath,'utf8');
