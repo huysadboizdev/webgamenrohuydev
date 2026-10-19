@@ -198,6 +198,7 @@ Session_ME2.update();
 					g.reset();
 				}
 			}
+			if (Management.tab == TabType.Tab1) NRO.Combat.ClientWebCombatDiagnostics.DrawPanel();
 		}
 
 		public void setsizeChange()
@@ -367,6 +368,12 @@ return "WEB-" + SystemInfo.deviceUniqueIdentifier;
         internal void checkInput()
         {
             if (!Management.CanProcessInput(TabType.Tab1)) return;
+			if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.F8)
+			{
+				NRO.Combat.ClientWebCombatDiagnostics.TogglePanel();
+				Event.current.Use();
+				return;
+			}
 			if (isPC && !ModFunc.isOpenAccMAnager && Event.current.type == EventType.KeyDown
 				&& Event.current.keyCode == KeyCode.V && Event.current.control)
 			{

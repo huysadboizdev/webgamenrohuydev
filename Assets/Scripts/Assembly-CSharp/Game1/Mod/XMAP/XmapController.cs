@@ -30,8 +30,30 @@ namespace Game1.Mod.XMAP
 
 		private static bool IsWaitNextMap;
 
+		private const long CapsuleSelectionTimeout = 10000L;
+		private static bool hasPendingCapsuleSelection;
+		private static int CapsuleTargetMap;
+		private static long CapsuleSelectionStartedAt;
+
 		public static void Update()
 		{
+			if (hasPendingCapsuleSelection)
+			{
+				if (TileMap.mapID == CapsuleTargetMap)
+				{
+					hasPendingCapsuleSelection = false;
+				}
+				else if (mSystem.currentTimeMillis() - CapsuleSelectionStartedAt >= CapsuleSelectionTimeout)
+				{
+					FinishXmap();
+					GameScr.info1.addInfo("Capsule map selection timed out", 0);
+					return;
+				}
+				else
+				{
+					return;
+				}
+			}
 			if (IsWaiting() || XmapData.GI().IsLoading)
 			{
 				return;
@@ -168,7 +190,12 @@ namespace Game1.Mod.XMAP
 			IsNextMapFailed = false;
 			XmapData.GI().MyLinkMaps = null;
 			WayXmap = null;
-			GameCanvas.panel.hide();
+			hasPendingCapsuleSelection = false;
+			XmapData.GI().CancelCapsuleLoading();
+			if (GameCanvas.panel != null && GameCanvas.panel.isShow)
+			{
+				GameCanvas.panel.hide();
+			}
 		}
 
 		public static void SaveIdMapCapsuleReturn()
@@ -323,8 +350,21 @@ namespace Game1.Mod.XMAP
 
 		private static void NextMapCapsule(MapNext mapNext)
 		{
-			SaveIdMapCapsuleReturn();
 			int selected = mapNext.Info[0];
+			BeginCapsuleSelection(selected, mapNext.MapID);
+		}
+
+		public static bool HasPendingCapsuleSelection
+		{
+			get { return hasPendingCapsuleSelection; }
+		}
+
+		private static void BeginCapsuleSelection(int selected, int targetMap)
+		{
+			SaveIdMapCapsuleReturn();
+			CapsuleTargetMap = targetMap;
+			CapsuleSelectionStartedAt = mSystem.currentTimeMillis();
+			hasPendingCapsuleSelection = true;
 			Service.gI().requestMapSelect(selected);
 		}
 

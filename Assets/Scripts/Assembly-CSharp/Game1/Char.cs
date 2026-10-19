@@ -657,6 +657,12 @@ namespace Game1
 		private int chargeCount;
 
 		private bool hasSendAttack;
+		private long skillPaintManaSpent;
+		private int skillPaintStaminaSpent;
+		private Skill pendingManualMobRetrySkill;
+		private Mob pendingManualMobRetryTarget;
+		private long pendingManualMobRetryAt;
+		private int pendingManualMobRetryMap;
 
 		public bool isMabuHold;
 
@@ -1384,8 +1390,43 @@ namespace Game1
 			}
 		}
 
+		private void cancelPendingManualMobRetry()
+		{
+			pendingManualMobRetrySkill = null;
+			pendingManualMobRetryTarget = null;
+			pendingManualMobRetryAt = 0L;
+		}
+
+		private void scheduleManualMobRetry(Skill skill, Mob target, int delayMs)
+		{
+			pendingManualMobRetrySkill = skill;
+			pendingManualMobRetryTarget = target;
+			pendingManualMobRetryAt = mSystem.currentTimeMillis() + System.Math.Max(0, delayMs);
+			pendingManualMobRetryMap = TileMap.mapID;
+		}
+
+		private void updatePendingManualMobRetry()
+		{
+			if (!me || pendingManualMobRetrySkill == null || pendingManualMobRetryTarget == null) return;
+			if (isLoadingMap || ischangingMap || Controller.isStopReadMessage
+				|| TileMap.mapID != pendingManualMobRetryMap || !Service.gI().IsCombatConnectionReady()
+				|| meDead || statusMe == 14 || statusMe == 5 || cHP <= 0
+				|| stone || sleepEff || blindEff || holdEffID != 0 || isTeleport || telePortSkill
+				|| myskill != pendingManualMobRetrySkill || mobFocus != pendingManualMobRetryTarget
+				|| pendingManualMobRetryTarget.status == 0 || pendingManualMobRetryTarget.status == 1
+				|| !GameScr.vMob.contains(pendingManualMobRetryTarget))
+			{
+				cancelPendingManualMobRetry();
+				return;
+			}
+			if (mSystem.currentTimeMillis() < pendingManualMobRetryAt || skillPaint != null) return;
+			cancelPendingManualMobRetry();
+			GameScr.gI().doFire(isFireByShortCut: false, skipWaypoint: true);
+		}
+
 		public virtual void update()
 		{
+			updatePendingManualMobRetry();
 			if (activeChargeSkill != null && !isWaitMonkey && !isStandAndCharge && !isFlyAndCharge && !isUseSkillAfterCharge && !isCreateDark) { activeChargeSkill = null; chargeMob = null; chargeChar = null; chargeOwnsMove = false; chargeOwnsAnimation = false; }
 			if (chargeOwnsAnimation && !chargeTargetIsValid()) stopUseChargeSkill();
 			if (isUseSkillAfterCharge && SkillCastTiming.NowMilliseconds() - chargeDeadline >= 10000) stopUseChargeSkill();
@@ -1567,6 +1608,11 @@ namespace Game1
 					}
 					tpos = 0;
 					isSetPos = false;
+					if (statusMe == 14 || statusMe == 5)
+					{
+						telePortSkill = false;
+						return;
+					}
 					cx = xPos;
 					cy = yPos;
 					cp1 = (cp2 = (cp3 = 0));
@@ -4277,19 +4323,32 @@ namespace Game1
 				return;
 			}
 			long num = mSystem.currentTimeMillis();
+			int mobSkillCooldown = myskill.coolDown;
+			if (mobFocus != null && charFocus == null && myskill.template != null && (myskill.template.type == 1 || myskill.template.type == 4))
+				mobSkillCooldown = System.Math.Max(0, mobSkillCooldown - 50);
 			if (me)
 			{
 				if (isSelectingSkillBuffToPlayer() && charFocus == null)
 				{
 					return;
 				}
-				if (!finishingCharge && num - myskill.lastTimeUseThisSkill < myskill.coolDown)
+				if (!finishingCharge && num - myskill.lastTimeUseThisSkill < mobSkillCooldown)
 				{
 					myskill.paintCanNotUseSkill = true;
 					return;
 				}
-				if (!finishingCharge || num - myskill.lastTimeUseThisSkill >= myskill.coolDown)
+				if (!finishingCharge && mobFocus != null && myskill.template != null
+					&& (myskill.template.type == 1 || myskill.template.type == 4)
+					&& !NRO.Combat.MobAttackResultTracker.CanAttemptFor(1, (byte)myskill.template.id, num))
+				{
+					myskill.paintCanNotUseSkill = true;
+					return;
+				}
+				cancelPendingManualMobRetry();
+				if (!finishingCharge || num - myskill.lastTimeUseThisSkill >= mobSkillCooldown)
 					myskill.lastTimeUseThisSkill = num;
+				long manaBeforeSkillPaint = cMP;
+				int staminaBeforeSkillPaint = cStamina;
 				if (myskill.template.manaUseType == 2)
 				{
 					cMP = 1L;
@@ -4309,6 +4368,8 @@ namespace Game1
 				{
 					cMP = 0L;
 				}
+				skillPaintManaSpent = System.Math.Max(0L, manaBeforeSkillPaint - cMP);
+				skillPaintStaminaSpent = System.Math.Max(0, staminaBeforeSkillPaint - cStamina);
 			}
 			if (me)
 			{
@@ -4381,21 +4442,29 @@ namespace Game1
 			}
 			if (skillPaint.id >= 128 && skillPaint.id <= 134)
 			{
+				if (me)
+				{
+					NRO.Combat.ClientWebCombatDiagnostics.RecordTeleportStart(1, skillPaint.id, cx, cy, mobFocus != null ? mobFocus.mobId : -1);
+				}
 				skillPaint = GameScr.sks[skillPaint.id - 65];
-				if (charFocus != null)
+				// Local coordinates are confirmed by packet 123; do not latch movement while waiting.
+				if (!me)
 				{
-					cx = charFocus.cx;
-					cy = charFocus.cy;
-					currentMovePoint = null;
+					if (charFocus != null)
+					{
+						cx = charFocus.cx;
+						cy = charFocus.cy;
+						currentMovePoint = null;
+					}
+					if (mobFocus != null)
+					{
+						cx = mobFocus.x;
+						cy = mobFocus.y;
+						currentMovePoint = null;
+					}
+					ServerEffect.addServerEffect(60, cx, cy, 1);
+					telePortSkill = true;
 				}
-				if (mobFocus != null)
-				{
-					cx = mobFocus.x;
-					cy = mobFocus.y;
-					currentMovePoint = null;
-				}
-				ServerEffect.addServerEffect(60, cx, cy, 1);
-				telePortSkill = true;
 			}
 			if (skillPaint.id >= 107 && skillPaint.id <= 113)
 			{
@@ -4810,8 +4879,44 @@ namespace Game1
 				}
 				if (me && !isSelectingSkillUseAlone() && !hasSendAttack)
 				{
-					Service.gI().sendPlayerAttack(myVector, myVector2, type);
-					hasSendAttack = true;
+					if ((cx != cxSend || cy != cySend) && !Service.gI().TryCharMove())
+					{
+						return;
+					}
+					Skill attackSkill = myskill;
+					long attackStartedAt = attackSkill.lastTimeUseThisSkill;
+					Mob attackTarget = mobFocus;
+					long rejectedManaRefund = skillPaintManaSpent;
+					int rejectedStaminaRefund = skillPaintStaminaSpent;
+					bool sent = Service.gI().TrySendPlayerAttack(myVector, myVector2, type, delegate(NRO.Combat.MobAttackResult result)
+					{
+						if (result.Status == NRO.Combat.MobAttackResultTracker.Accepted
+							|| attackSkill.lastTimeUseThisSkill != attackStartedAt) return;
+						long retryAfter = result.Status == NRO.Combat.MobAttackResultTracker.OutOfRange ? 0L : result.RetryAfterMs;
+						long retryAt = mSystem.currentTimeMillis() + retryAfter;
+						attackSkill.lastTimeUseThisSkill = retryAfter > 0
+							? retryAt - attackSkill.coolDown : 0L;
+						attackSkill.paintCanNotUseSkill = false;
+						if ((result.Status == NRO.Combat.MobAttackResultTracker.OutOfRange
+							|| result.Status == NRO.Combat.MobAttackResultTracker.Cooldown)
+							&& myskill == attackSkill && mobFocus == attackTarget
+							&& attackTarget != null && attackTarget.status != 0 && attackTarget.status != 1)
+						{
+							// Wait until both the server's retry time and this punch animation have finished.
+							int retryDelay = result.Status == NRO.Combat.MobAttackResultTracker.Cooldown ? result.RetryAfterMs : 0;
+							scheduleManualMobRetry(attackSkill, attackTarget, retryDelay);
+						}
+					});
+					if (!sent)
+					{
+						cMP = System.Math.Min(cMPFull, cMP + rejectedManaRefund);
+						cStamina = System.Math.Min(cMaxStamina, cStamina + rejectedStaminaRefund);
+						skillPaintManaSpent = 0L;
+						skillPaintStaminaSpent = 0;
+						attackSkill.lastTimeUseThisSkill = 0;
+						attackSkill.paintCanNotUseSkill = false;
+					}
+					else hasSendAttack = true;
 				}
 				return;
 			}
@@ -6829,11 +6934,11 @@ namespace Game1
 			tpos = 0;
 			if (me)
 			{
-				if (GameCanvas.panel != null)
+				if (GameCanvas.panel != null && GameCanvas.panel.isShow)
 				{
 					GameCanvas.panel.hide();
 				}
-				if (GameCanvas.panel2 != null)
+				if (GameCanvas.panel2 != null && GameCanvas.panel2.isShow)
 				{
 					GameCanvas.panel2.hide();
 				}

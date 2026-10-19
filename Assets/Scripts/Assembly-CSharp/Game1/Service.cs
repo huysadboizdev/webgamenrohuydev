@@ -1,4 +1,5 @@
 using System;
+using NRO.Combat;
 using Game1.Assets.src.g;
 
 namespace Game1
@@ -6,6 +7,10 @@ namespace Game1
 	public class Service
 	{
 		private ISession session = Session_ME.gI();
+		private int pendingSelfMobSequence;
+		private byte pendingSelfMobSkill;
+		private int pendingSelfMobAttempt;
+		private bool pendingSelfMobSent;
 
 		protected static Service instance;
 
@@ -341,20 +346,60 @@ namespace Game1
 		public void skill_not_focus(sbyte status)
 		{
 			Message message = null;
+			int selfSequence = 0;
+			int selfAttempt = 0;
 			try
 			{
 				message = new Message(-45);
 				message.writer().writeByte(status);
+				if (pendingSelfMobSequence != 0 && Char.myCharz().myskill != null
+					&& Char.myCharz().myskill.template != null
+					&& Char.myCharz().myskill.template.id == pendingSelfMobSkill)
+				{
+					selfSequence = pendingSelfMobSequence;
+					selfAttempt = pendingSelfMobAttempt;
+					message.writer().writeByte(0xA7);
+					message.writer().writeInt(pendingSelfMobSequence);
+					message.writer().writeByte(pendingSelfMobSkill);
+					NRO.Combat.ClientWebCombatDiagnostics.RecordSend(1, pendingSelfMobAttempt, pendingSelfMobSequence, pendingSelfMobSkill, 255);
+					pendingSelfMobSequence = 0;
+				}
 				session.sendMessage(message);
+				if (selfSequence != 0) pendingSelfMobSent = true;
 			}
 			catch (Exception ex)
 			{
+				if (selfSequence != 0)
+				{
+					NRO.Combat.MobAttackResultTracker.CancelFor(1, selfSequence);
+					NRO.Combat.ClientWebCombatDiagnostics.RecordAttackBlocked(1, selfAttempt, "send_failed");
+				}
 				Cout.println(ex.Message + ex.StackTrace);
 			}
 			finally
 			{
 				message.cleanup();
 			}
+		}
+
+		public bool TrySendSelfMobSkill(Skill skill, Action<MobAttackResult> callback)
+		{
+			if (skill == null || skill.template == null || !IsCombatConnectionReady() || pendingSelfMobSequence != 0) return false;
+			int attempt = NRO.Combat.ClientWebCombatDiagnostics.RecordAttackAttempt(1, 1, 0, 1, -1, -1);
+			int sequence = NRO.Combat.MobAttackResultTracker.BeginFor(1, (byte)skill.template.id, 255, callback);
+			pendingSelfMobSequence = sequence;
+			pendingSelfMobSkill = (byte)skill.template.id;
+			pendingSelfMobAttempt = attempt;
+			pendingSelfMobSent = false;
+			Char.myCharz().useSkillNotFocus();
+			if (!pendingSelfMobSent)
+			{
+				if (pendingSelfMobSequence == sequence) pendingSelfMobSequence = 0;
+				NRO.Combat.MobAttackResultTracker.CancelFor(1, sequence);
+				NRO.Combat.ClientWebCombatDiagnostics.RecordAttackBlocked(1, attempt, "self_skill_not_dispatched");
+				return false;
+			}
+			return true;
 		}
 
 		public void clanDonate(int id)
@@ -1245,12 +1290,35 @@ namespace Game1
         public void sendPlayerAttack(MyVector vMob, MyVector vChar, int type) { TrySendPlayerAttack(vMob, vChar, type); }
 		public bool TrySendPlayerAttack(MyVector vMob, MyVector vChar, int type)
 		{
-            if (!IsCombatConnectionReady() || vMob == null || vChar == null || (vMob.size() == 0 && vChar.size() == 0)) return false;
+			return TrySendPlayerAttack(vMob, vChar, type, null);
+		}
+		public bool TrySendPlayerAttack(MyVector vMob, MyVector vChar, int type, Action<MobAttackResult> resultCallback)
+		{
+			int mobCount = vMob == null ? 0 : vMob.size();
+			int charCount = vChar == null ? 0 : vChar.size();
+			Mob diagnosticMob = mobCount > 0 ? (Mob)vMob.elementAt(0) : null;
+			int diagnosticMobId = diagnosticMob == null ? -1 : diagnosticMob.mobId;
+			long diagnosticMobHp = diagnosticMob == null ? -1L : diagnosticMob.hp;
+			int attemptId = NRO.Combat.ClientWebCombatDiagnostics.RecordAttackAttempt(1, type, mobCount, charCount, diagnosticMobId, diagnosticMobHp);
+			if (!IsCombatConnectionReady())
+			{
+				NRO.Combat.ClientWebCombatDiagnostics.RecordAttackBlocked(1, attemptId, "connection_not_ready");
+				return false;
+			}
+			if (vMob == null || vChar == null || (mobCount == 0 && charCount == 0))
+			{
+				NRO.Combat.ClientWebCombatDiagnostics.RecordAttackBlocked(1, attemptId, "missing_target_vector");
+				return false;
+			}
+			int pendingSequence = 0;
+			byte pendingSkillId = 0;
+			byte pendingMobId = 0;
 			try
 			{
 				Message message = null;
 				if (type == 0)
 				{
+					NRO.Combat.ClientWebCombatDiagnostics.RecordAttackBlocked(1, attemptId, "invalid_attack_type");
 					return false;
 				}
 				if (vMob.size() > 0 && vChar.size() > 0)
@@ -1308,19 +1376,52 @@ namespace Game1
 					}
 				}
 				message.writer().writeSByte((sbyte)Char.myCharz().cdir);
+				if (message != null && message.command == 54 && vMob.size() == 1 && vChar.size() == 0)
+				{
+					Mob targetMob = (Mob)vMob.elementAt(0);
+					Skill activeSkill = Char.myCharz().myskill;
+					if (targetMob != null && !targetMob.isMobMe && activeSkill != null && activeSkill.template != null)
+					{
+						pendingSequence = MobAttackResultTracker.BeginFor(1, (byte)activeSkill.template.id, (byte)targetMob.mobId, resultCallback);
+						if (pendingSequence == 0)
+						{
+							NRO.Combat.ClientWebCombatDiagnostics.RecordAttackBlocked(1, attemptId, "sequence_not_created");
+							message.cleanup();
+							return false;
+						}
+						pendingSkillId = (byte)activeSkill.template.id;
+						pendingMobId = (byte)targetMob.mobId;
+						message.writer().writeByte(0xA7);
+						message.writer().writeInt(pendingSequence);
+						message.writer().writeByte(activeSkill.template.id);
+					}
+				}
 				if (message != null)
 				{
 					session.sendMessage(message);
-                    #if UNITY_WEBGL && !UNITY_EDITOR
-                    return IsCombatConnectionReady();
+					if (mobCount > 0 && pendingSequence == 0)
+						NRO.Combat.ClientWebCombatDiagnostics.RecordAttackPacketSent(1, attemptId, message.command, diagnosticMobId);
+                    if (pendingSequence != 0)
+                    {
+                        NRO.Combat.MobAttackTrace.RecordSend(1, pendingSequence, pendingSkillId, pendingMobId);
+                        NRO.Combat.ClientWebCombatDiagnostics.RecordSend(1, attemptId, pendingSequence, pendingSkillId, pendingMobId);
+                    }
+#if UNITY_WEBGL && !UNITY_EDITOR
+                    bool connected = IsCombatConnectionReady();
+                    if (!connected && pendingSequence != 0) MobAttackResultTracker.CancelFor(1, pendingSequence);
+                    if (!connected) NRO.Combat.ClientWebCombatDiagnostics.RecordAttackBlocked(1, attemptId, "connection_lost_after_send");
+                    return connected;
 #else
                     return true;
 #endif
 				}
-                return false;
+				NRO.Combat.ClientWebCombatDiagnostics.RecordAttackBlocked(1, attemptId, "no_attack_packet_created");
+				return false;
 			}
-			catch (Exception)
+			catch (Exception error)
 			{
+				if (pendingSequence != 0) MobAttackResultTracker.CancelFor(1, pendingSequence);
+				NRO.Combat.ClientWebCombatDiagnostics.RecordAttackBlocked(1, attemptId, "exception_" + error.GetType().Name);
                 return false;
 			}
 		}

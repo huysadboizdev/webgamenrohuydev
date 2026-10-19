@@ -442,13 +442,14 @@ namespace Game1
 			return result;
 		}
 
+		private const int MaxReceiveMessagesPerFrame = 64;
+		private const int ReceiveBudgetMilliseconds = 2;
+		private static int lastReceiveFrame = -1;
+
 		public static void onRecieveMsg(Message msg)
 		{
-			if (Thread.CurrentThread.Name == Main.mainThreadName)
-			{
-				messageHandler.onMessage(msg);
-			}
-			else
+			// Main-thread arrivals must obey the same FIFO and capsule pause.
+			lock (recieveMsg)
 			{
 				recieveMsg.addElement(msg);
 			}
@@ -456,21 +457,29 @@ namespace Game1
 
 		public static void update()
 		{
-			while (recieveMsg.size() > 0)
+			int frame = Time.frameCount;
+			if (Controller.isStopReadMessage || lastReceiveFrame == frame) return;
+			lock (recieveMsg)
 			{
-				Message message = (Message)recieveMsg.elementAt(0);
-				if (!Controller.isStopReadMessage)
+				if (recieveMsg.size() == 0) return;
+			}
+			lastReceiveFrame = frame;
+			long started = System.Diagnostics.Stopwatch.GetTimestamp();
+			for (int processed = 0; processed < MaxReceiveMessagesPerFrame; processed++)
+			{
+				// A departure handler can suspend reads until Teleport finishes.
+				if (Controller.isStopReadMessage) return;
+				Message message;
+				lock (recieveMsg)
 				{
-					if (message == null)
-					{
-						recieveMsg.removeElementAt(0);
-						break;
-					}
-					messageHandler.onMessage(message);
+					if (recieveMsg.size() == 0) return;
+					message = (Message)recieveMsg.elementAt(0);
 					recieveMsg.removeElementAt(0);
-					continue;
 				}
-				break;
+				// Never hold the producer lock while loading map/image resources.
+				if (message != null) messageHandler.onMessage(message);
+				if ((System.Diagnostics.Stopwatch.GetTimestamp() - started) * 1000
+					>= System.Diagnostics.Stopwatch.Frequency * ReceiveBudgetMilliseconds) return;
 			}
 		}
 
@@ -576,8 +585,10 @@ namespace Game1
         public static string strRecvByteCount = string.Empty;
         public static MyVector recieveMsg = new MyVector();
         const int MaximumQueuedPackets = 4096, MaximumQueuedBytes = 8 * 1024 * 1024;
+        const int MaxReceiveMessagesPerFrame = 64, ReceiveBudgetMilliseconds = 2;
         static readonly Dictionary<Message, int> receiveSizes = new Dictionary<Message, int>();
         static int queuedReceiveBytes;
+        static int lastReceiveFrame = -1;
         static Action deferredEnded;
         readonly WebSessionCore core;
         long timeWaitConnect;
@@ -613,13 +624,19 @@ namespace Game1
         }
         static void ClearReceiveQueue()
         {
-            recieveMsg.removeAllElements(); receiveSizes.Clear(); queuedReceiveBytes = 0; deferredEnded = null;
+            lock (recieveMsg)
+            {
+                recieveMsg.removeAllElements(); receiveSizes.Clear(); queuedReceiveBytes = 0; deferredEnded = null;
+            }
         }
         static void QueueMessage(Message message, int bytes)
         {
-            if (recieveMsg.size() >= MaximumQueuedPackets || bytes > MaximumQueuedBytes - queuedReceiveBytes)
-                throw new InvalidOperationException("Decoded protocol queue exceeded");
-            receiveSizes.Add(message, bytes); queuedReceiveBytes += bytes; recieveMsg.addElement(message);
+            lock (recieveMsg)
+            {
+                if (recieveMsg.size() >= MaximumQueuedPackets || bytes > MaximumQueuedBytes - queuedReceiveBytes)
+                    throw new InvalidOperationException("Decoded protocol queue exceeded");
+                receiveSizes.Add(message, bytes); queuedReceiveBytes += bytes; recieveMsg.addElement(message);
+            }
         }
         static Message ToMessage(ProtocolPacket packet)
         {
@@ -674,16 +691,50 @@ namespace Game1
         public static void onRecieveMsg(Message message) { QueueMessage(message, 4); }
         public static void update()
         {
-            while (recieveMsg.size() > 0 && !Controller.isStopReadMessage && messageHandler != null)
+            int frame = Time.frameCount;
+            Action callback = null;
+            lock (recieveMsg)
             {
-                Message message = (Message)recieveMsg.elementAt(0); recieveMsg.removeElementAt(0);
-                int bytes; if (message != null && receiveSizes.TryGetValue(message, out bytes)) { queuedReceiveBytes -= bytes; receiveSizes.Remove(message); }
+                if (recieveMsg.size() == 0 && deferredEnded != null)
+                {
+                    callback = deferredEnded;
+                    deferredEnded = null;
+                }
+            }
+            if (callback != null) { callback(); return; }
+            if (Controller.isStopReadMessage || messageHandler == null || lastReceiveFrame == frame) return;
+            lastReceiveFrame = frame;
+            long started = System.Diagnostics.Stopwatch.GetTimestamp();
+            for (int processed = 0; processed < MaxReceiveMessagesPerFrame; processed++)
+            {
+                if (Controller.isStopReadMessage || messageHandler == null) return;
+                Message message;
+                lock (recieveMsg)
+                {
+                    if (recieveMsg.size() == 0) break;
+                    message = (Message)recieveMsg.elementAt(0);
+                    recieveMsg.removeElementAt(0);
+                    int bytes;
+                    if (message != null && receiveSizes.TryGetValue(message, out bytes))
+                    {
+                        queuedReceiveBytes -= bytes;
+                        receiveSizes.Remove(message);
+                    }
+                }
                 if (message != null) messageHandler.onMessage(message);
+                if ((System.Diagnostics.Stopwatch.GetTimestamp() - started) * 1000
+                    >= System.Diagnostics.Stopwatch.Frequency * ReceiveBudgetMilliseconds) return;
             }
-            if (recieveMsg.size() == 0 && deferredEnded != null)
+            callback = null;
+            lock (recieveMsg)
             {
-                Action callback = deferredEnded; deferredEnded = null; callback();
+                if (recieveMsg.size() == 0 && deferredEnded != null)
+                {
+                    callback = deferredEnded;
+                    deferredEnded = null;
+                }
             }
+            if (callback != null) callback();
         }
         public static int currentTimeMillis() { return Environment.TickCount; }
         public bool isCompareIPConnect() { return true; }

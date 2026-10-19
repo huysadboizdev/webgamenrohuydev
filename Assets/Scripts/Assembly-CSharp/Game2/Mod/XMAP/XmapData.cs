@@ -27,7 +27,14 @@ namespace Game2.Mod.XMAP
 
 		public bool IsLoading;
 
+		private const long CapsuleLoadTimeout = 10000L;
 		private bool IsLoadingCapsule;
+		private long CapsuleLoadStartedAt;
+
+		public bool IsCapsuleLoading
+		{
+			get { return IsLoadingCapsule; }
+		}
 
 		private static XmapData Instance;
 
@@ -63,18 +70,24 @@ namespace Game2.Mod.XMAP
 					IsLoadingCapsule = false;
 					IsLoading = false;
 				}
+				else if (mSystem.currentTimeMillis() - CapsuleLoadStartedAt >= CapsuleLoadTimeout)
+				{
+					CancelCapsuleLoading();
+					XmapController.FinishXmap();
+					GameScr.info1.addInfo("Capsule map list timed out", 0);
+				}
 				return;
 			}
 			LoadLinkMapBase();
-			if (CanUseCapsuleVip())
+			if (CanUseCapsuleVip() && AutoXmap.CanRequestCapsuleMapList())
 			{
+				StartCapsuleLoading();
 				XmapController.UseCapsuleVip();
-				IsLoadingCapsule = true;
 			}
-			else if (CanUseCapsuleNormal())
+			else if (CanUseCapsuleNormal() && AutoXmap.CanRequestCapsuleMapList())
 			{
+				StartCapsuleLoading();
 				XmapController.UseCapsuleNormal();
-				IsLoadingCapsule = true;
 			}
 			else
 			{
@@ -148,6 +161,23 @@ namespace Game2.Mod.XMAP
 					break;
 				}
 			}
+		}
+
+		private void StartCapsuleLoading()
+		{
+			IsLoadingCapsule = true;
+			CapsuleLoadStartedAt = mSystem.currentTimeMillis();
+		}
+
+				public void CancelCapsuleLoading()
+		{
+			if (IsLoadingCapsule && !AutoXmap.IsShowPanelMapTrans)
+			{
+				AutoXmap.IgnorePendingCapsulePanelResponse();
+			}
+			IsLoadingCapsule = false;
+			IsLoading = false;
+			AutoXmap.IsShowPanelMapTrans = true;
 		}
 
 		private void LoadLinkMapCapsule()

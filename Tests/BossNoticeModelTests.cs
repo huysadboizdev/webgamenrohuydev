@@ -9,6 +9,8 @@ public static class BossNoticeModelTests
         string detail=row.Details(1240000);
         Check(detail.Contains("admin")&&detail.Contains("2 phút trước")&&detail.Contains("3 phút nữa")&&detail.Contains("Núi"),"killer map age ETA");
         Check(!detail.Contains("khu")&&!detail.Contains("Khu"),"no zone details");
+        row.Status="ALIVE";row.Map="Map";Check(row.Summary(1240000).Contains("S\u1ed1ng")&&row.Summary(1240000).Contains("Map")&&!row.Summary(1240000).Contains("ph\u00fat"),"alive summary shows only map without countdown");
+        row.Status="DEFEATED";Check(row.Summary(1240000).Contains("3 ph\u00fat"),"defeated summary shows a valid countdown");
         row.Next=0;row.Eta="CONDITION";Check(row.Details(1240000).Contains("Chờ điều kiện"),"conditional ETA unknown");
         row.Status="DEPARTED";row.Defeated=0;Check(!row.Details(1240000).Contains("Người hạ"),"despawn is not defeat");
         row.Status="PREVIOUS_RUN";Check(row.Details(1240000).Contains("phiên server trước"),"restart never claims old alive");

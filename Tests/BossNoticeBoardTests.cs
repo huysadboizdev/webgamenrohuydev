@@ -12,7 +12,7 @@ public static class BossNoticeBoardTests {
         Check((int)second.GetField("pending",Fields).GetValue(null)==100,"first account reset cannot modify second tab request");
         Check(!object.ReferenceEquals(first.GetField("entries",Fields).GetValue(null),second.GetField("entries",Fields).GetValue(null)),"two account tabs own separate row lists");
         second.GetMethod("Reset",Fields).Invoke(null,null);
-        foreach(string ns in new[]{"Game1","Game2"})Verify(ns);UnityEngine.Debug.Log("PASS both boss boards: BOSS1 exact decode, BOSS2 categories/support/zone, stale category/page protection, reset, no periodic refresh, refresh on open, stable details");}
+        foreach(string ns in new[]{"Game1","Game2"})Verify(ns);UnityEngine.Debug.Log("PASS both boss boards: lazy BOSS2 requests, categories/support/zone, stale category/page protection, push cache, reset, reconnect refresh, no periodic polling");}
     static void Verify(string ns){
         var assembly=typeof(Game1.Panel).Assembly;
         Type board=assembly.GetType(ns+".BossNoticeBoard",true),panelType=assembly.GetType(ns+".Panel",true),canvas=assembly.GetType(ns+".GameCanvas",true);
@@ -23,7 +23,7 @@ public static class BossNoticeBoardTests {
         var panel=FormatterServices.GetUninitializedObject(panelType);canvas.GetField("panel").SetValue(null,panel);
         try{
             board.GetMethod("Receive",Fields).Invoke(null,new[]{Packet(ns,0,0,true,2,0)});
-            Check((long)get("sent")>0&&(bool)get("categoriesSupported"),"bootstrap starts local throttle to match server request0");
+            Check((bool)get("categoriesSupported"),"legacy bootstrap response updates capability only");
             reset();
             set("mode",1);set("category",2);set("sentCategory",2);set("sentMode",1);set("pending",41);set("page",1);set("sentPage",0);
             Action<int,int> receive=(id,page)=>board.GetMethod("Receive",Fields).Invoke(null,new[]{Packet(ns,id,page)});
@@ -55,6 +55,10 @@ public static class BossNoticeBoardTests {
             board.GetMethod("Receive",Fields).Invoke(null,new[]{Packet(ns,80,0,true,1,0)});
             first=(BossNoticeEntry)((System.Collections.IList)get("entries"))[0];
             Check(first.Category==1&&first.Zone==7&&first.Support&&!first.Details(1240000).Contains("Khu:"),"BOSS2 semantic category support and public zone decoded");
+            board.GetMethod("Receive",Fields).Invoke(null,new[]{Packet(ns,0,0,true,1,0,true,5)});
+            Check((long)get("revision")==5&&((System.Collections.IDictionary)get("cache")).Contains("1:0:0"),"push snapshot updates hidden query cache");
+            board.GetMethod("Receive",Fields).Invoke(null,new[]{Packet(ns,0,0,true,1,0,true,4)});
+            Check((long)get("revision")==5,"stale push revision is ignored");
             set("pending",81);set("category",2);set("page",0);set("sentPage",0);
             board.GetMethod("Receive",Fields).Invoke(null,new[]{Packet(ns,81,0,true,1,0)});
             Check((bool)get("wants")&&((System.Collections.IList)get("entries"))[0]==first,"changed category rejects matching old request");
@@ -63,7 +67,7 @@ public static class BossNoticeBoardTests {
             reset();Check((int)get("mode")==-1&&(int)get("pending")==0&&((System.Collections.IList)get("entries")).Count==0,"reconnect reset removes prior state");
         }finally{canvas.GetField("panel").SetValue(null,oldPanel);reset();}
     }
-    static object Packet(string ns,int id,int page,bool v2=false,int category=2,int kind=1){
+    static object Packet(string ns,int id,int page,bool v2=false,int category=2,int kind=1,bool push=false,long revision=0){
         var assembly=typeof(Game1.Panel).Assembly;Type message=assembly.GetType(ns+".Message",true);
         object outgoing=Activator.CreateInstance(message,new object[]{-58});object w=message.GetMethod("writer").Invoke(outgoing,null);
         Action<string,object> write=(n,v)=>{
@@ -72,7 +76,7 @@ public static class BossNoticeBoardTests {
                 method.Invoke(w,new object[]{(int)(number>>32)});method.Invoke(w,new object[]{unchecked((int)number)});
             }else w.GetType().GetMethod(n,new[]{v.GetType()}).Invoke(w,new[]{v});
         };
-        if(v2){write("writeInt",-2);write("writeInt",id);write("writeByte",(sbyte)category);}else write("writeInt",id);write("writeByte",(sbyte)kind);write("writeShort",page);write("writeShort",2);write("writeLong",1240000L);write("writeUTF","");write("writeShort",1);
+        if(push){write("writeInt",-3);write("writeByte",(sbyte)category);write("writeByte",(sbyte)kind);write("writeShort",page);write("writeShort",2);write("writeLong",revision);}else if(v2){write("writeInt",-2);write("writeInt",id);write("writeByte",(sbyte)category);}else write("writeInt",id);if(!push){write("writeByte",(sbyte)kind);write("writeShort",page);write("writeShort",2);}write("writeLong",1240000L);write("writeUTF","");write("writeShort",1);
         foreach(string s in new[]{"spawn","Fide","Núi","admin","DEFEATED"})write("writeUTF",s);
         write("writeLong",1000000L);write("writeLong",1120000L);write("writeLong",1420000L);write("writeUTF","COOLDOWN");
         if(v2){write("writeByte",(sbyte)category);write("writeInt",-20);write("writeByte",(sbyte)1);write("writeShort",7);}

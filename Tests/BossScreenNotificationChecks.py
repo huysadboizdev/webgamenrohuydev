@@ -152,8 +152,8 @@ class Test {
     static void Main() {
         Check(BossScreenNoticeData.ScreenCommand == 115, "screen command");
         Check(BossScreenNoticeData.ShouldShow(1000, 5, 0), "ordinary boss remains visible");
-        Check(BossScreenNoticeData.ShouldShow(-233, 113, 0), "same 12h identity outside Oshin stays visible");
-        Check(BossScreenNoticeData.ShouldShow(-233, 121, 0), "same 12h identity outside Oshin stays visible");
+        Check(!BossScreenNoticeData.ShouldShow(-233, 113, 0), "12h identity hidden on every map");
+        Check(!BossScreenNoticeData.ShouldShow(-233, 121, 0), "12h identity hidden on every map");
         int[] twelveHour = new int[] { -233, -234, -235, -236, -237, -238, -343, -341, -342 };
         foreach (int id in twelveHour) Check(!BossScreenNoticeData.ShouldShow(id, 114, 0), "Oshin 12h hidden " + id);
         foreach (int id in twelveHour) Check(!BossScreenNoticeData.ShouldShow(id, 120, 0), "Oshin 12h hidden " + id);

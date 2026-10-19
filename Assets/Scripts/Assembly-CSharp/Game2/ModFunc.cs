@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Game2.Mod;
 using Game2.Mod.XMAP;
+using NRO.Combat;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -673,21 +674,132 @@ namespace Game2
 
 		public void AutoAttack()
 		{
-            if (PickMob.tanSat || PickMob.tsPlayer) return;
+			if (PickMob.tanSat || PickMob.tsPlayer) return;
 			Char @char = Char.myCharz();
-			if (!Char.isLoadingMap && !@char.stone && !@char.meDead && @char.statusMe != 14 && @char.statusMe != 5 && @char.myskill.template.type == 1 && @char.myskill.template.id != 10 && @char.myskill.template.id != 11 && !@char.myskill.paintCanNotUseSkill && mSystem.currentTimeMillis() - lastAutoAttack > 500)
+			if (@char == null || @char.myskill == null || @char.myskill.template == null
+				|| Char.isLoadingMap || @char.stone || @char.meDead || @char.statusMe == 14 || @char.statusMe == 5
+				|| @char.skillPaint != null || @char.dart != null)
 			{
-				if (GameScr.gI().isMeCanAttackMob(@char.mobFocus) && Res.abs(@char.mobFocus.xFirst - @char.cx) < @char.myskill.dx * 2)
+				return;
+			}
+
+			Skill skill = @char.myskill;
+			int skillType = skill.template.type;
+			sbyte skillId = skill.template.id;
+			if (skillId == 7 || skillType == 2 || (skillType == 3 && skillId == 8)
+				|| (skillId != 10 && skillId != 11 && skillType != 1 && skillType != 3 && skillType != 4))
+			{
+				return;
+			}
+
+			long now = mSystem.currentTimeMillis();
+			if (now - lastAutoAttack <= 500) return;
+			bool canAttackMob = GameScr.gI().isMeCanAttackMob(@char.mobFocus);
+			bool canAttackPlayer = @char.isMeCanAttackOtherPlayer(@char.charFocus);
+			bool hasTarget = canAttackMob || canAttackPlayer;
+			bool isChargeSkill = skillId == 10 || skillId == 11;
+			if ((skillType == 1 || skillType == 4 || isChargeSkill) && !hasTarget) return;
+
+			long manaRequired = skill.template.manaUseType == 2 ? 1L
+				: (skill.template.manaUseType == 1 ? (long)skill.manaUse * @char.cMPFull / 100L : skill.manaUse);
+			if (@char.cMP < manaRequired || skill.paintCanNotUseSkill) return;
+			int cooldown = skill.coolDown;
+			if (skillType == 1 && canAttackMob) cooldown = System.Math.Max(0, cooldown - 50);
+			if (now - skill.lastTimeUseThisSkill < cooldown) return;
+
+			if (isChargeSkill)
+			{
+				if (@char.isStandAndCharge || @char.isFlyAndCharge || @char.isWaitMonkey || @char.isUseSkillAfterCharge) return;
+				@char.sendUseChargeSkill();
+				if (@char.isStandAndCharge || @char.isFlyAndCharge || @char.isWaitMonkey || @char.isUseSkillAfterCharge)
+					lastAutoAttack = now;
+				return;
+			}
+
+			if (skillType == 3)
+			{
+				long lastUsedAt = skill.lastTimeUseThisSkill;
+				@char.useSkillNotFocus();
+				if (skill.lastTimeUseThisSkill != lastUsedAt || @char.skillPaint != null)
+					lastAutoAttack = now;
+				return;
+			}
+
+			if (skillType == 4)
+			{
+				if (now - lastAutoAttack <= System.Math.Max(500, skill.coolDown)) return;
+				if (canAttackMob)
 				{
-					AttackMob(@char.mobFocus);
-					SetUsedSkill(@char.myskill);
+					long deltaX = System.Math.Abs((long)@char.mobFocus.xFirst - @char.cx);
+					long deltaY = System.Math.Abs((long)@char.mobFocus.yFirst - @char.cy);
+					if (!NRO.Combat.MassacreAttackRange.IsWithinSkillRange(skillId, deltaX, deltaY, skill.dx, skill.dy))
+					{
+						int moveX;
+						if (deltaX > skill.dx)
+						{
+							int offset = NRO.Combat.MassacreAttackRange.GetApproachOffset(skillId, skill.dx);
+							moveX = @char.mobFocus.xFirst + ((@char.cx > @char.mobFocus.xFirst) ? offset : -offset);
+						}
+						else
+						{
+							moveX = @char.cx + ((@char.cx >= @char.mobFocus.xFirst) ? 1 : -1);
+						}
+						@char.cdir = ((@char.cx < @char.mobFocus.xFirst) ? 1 : -1);
+						@char.currentMovePoint = new MovePoint(moveX, @char.mobFocus.yFirst);
+						@char.endMovePointCommand = new Command(null, null, 8002, null);
+						return;
+					}
 				}
-				else if (@char.isMeCanAttackOtherPlayer(@char.charFocus) && Res.abs(@char.charFocus.cx - @char.cx) < @char.myskill.dx * 2)
+				GameScr.gI().doFire(isFireByShortCut: false, skipWaypoint: true);
+				lastAutoAttack = now;
+				return;
+			}
+
+			if (canAttackMob)
+			{
+				long deltaX = System.Math.Abs((long)@char.mobFocus.xFirst - @char.cx);
+				long deltaY = System.Math.Abs((long)@char.mobFocus.yFirst - @char.cy);
+				if (!NRO.Combat.MassacreAttackRange.IsWithinSkillRange(skillId, deltaX, deltaY, skill.dx, skill.dy))
 				{
-					AttackChar();
-					SetUsedSkill(@char.myskill);
+					GameScr.gI().doFire(isFireByShortCut: false, skipWaypoint: true);
+					lastAutoAttack = now;
+					return;
 				}
-				lastAutoAttack = mSystem.currentTimeMillis();
+				if ((@char.cx != @char.cxSend || @char.cy != @char.cySend) && !Service.gI().TryCharMove()) return;
+
+				MyVector mobs = new MyVector();
+				mobs.addElement(@char.mobFocus);
+				Skill attackSkill = skill;
+				long attackStartedAt = 0L;
+				bool sent = Service.gI().TrySendPlayerAttack(mobs, new MyVector(), 1, delegate(MobAttackResult result)
+				{
+					if (result.Status == MobAttackResultTracker.Accepted
+						|| attackSkill.lastTimeUseThisSkill != attackStartedAt) return;
+					SetUsedSkill(attackSkill, result.Status == MobAttackResultTracker.OutOfRange ? 0 : result.RetryAfterMs);
+				});
+				if (sent)
+				{
+					SetUsedSkill(attackSkill);
+					attackStartedAt = attackSkill.lastTimeUseThisSkill;
+				}
+				lastAutoAttack = now;
+				return;
+			}
+
+			if (canAttackPlayer)
+			{
+				long deltaX = System.Math.Abs((long)@char.charFocus.cx - @char.cx);
+				long deltaY = System.Math.Abs((long)@char.charFocus.cy - @char.cy);
+				if (!NRO.Combat.MassacreAttackRange.IsWithinSkillRange(skillId, deltaX, deltaY, skill.dx, skill.dy))
+				{
+					GameScr.gI().doFire(isFireByShortCut: false, skipWaypoint: true);
+					lastAutoAttack = now;
+					return;
+				}
+				MyVector chars = new MyVector();
+				chars.addElement(@char.charFocus);
+				if (Service.gI().TrySendPlayerAttack(new MyVector(), chars, 2)) SetUsedSkill(skill);
+				lastAutoAttack = now;
 			}
 		}
 
@@ -695,6 +807,15 @@ namespace Game2
 		{
 			skill.paintCanNotUseSkill = true;
 			skill.lastTimeUseThisSkill = mSystem.currentTimeMillis();
+		}
+
+		public void SetUsedSkill(Skill skill, int retryAfterMs)
+		{
+			if (skill == null) return;
+			long now = mSystem.currentTimeMillis();
+			int remaining = System.Math.Min(System.Math.Max(0, retryAfterMs), System.Math.Max(0, skill.coolDown));
+			skill.paintCanNotUseSkill = remaining > 0;
+			skill.lastTimeUseThisSkill = now + remaining - skill.coolDown;
 		}
 
 		public void UsePorata()

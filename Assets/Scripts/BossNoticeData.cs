@@ -25,6 +25,13 @@ public sealed class BossNoticeEntry
     public string State {
         get {switch(Status){case "ALIVE":return "Đang xuất hiện";case "DEFEATED":return "Đã bị hạ";case "DEPARTED":return "Đã rời bản đồ";case "PREVIOUS_RUN":return "Lượt của phiên server trước";default:return "Chưa xác định";}}
     }
+    public string Summary(long now){
+        if(Status=="ALIVE")return Name+"\u00b7 S\u1ed1ng \u00b7 "+Map;
+        if((Status=="DEFEATED"||Status=="DEPARTED")&&Next>now)return Name+"\u00b7 H\u1ed3i sinh sau "+Math.Max(1,(Next-now+59999)/60000)+" ph\u00fat";
+        if(Eta=="CONDITION")return Name+"\u00b7 Ch\u1edd \u0111i\u1ec1u ki\u1ec7n";
+        if(Eta=="SCHEDULE")return Name+"\u00b7 Ch\u1edd l\u1ecbch";
+        return Name+"\u00b7 Ch\u01b0a r\u00f5 gi\u1edd h\u1ed3i sinh";
+    }
     public string Details(long now){
         var text=new StringBuilder();text.Append(Name).Append('\n').Append("Trạng thái: ").Append(State).Append('\n');
         text.Append(Status=="ALIVE"?"Bản đồ: ":"Bản đồ lần này: ").Append(Map).Append('\n');

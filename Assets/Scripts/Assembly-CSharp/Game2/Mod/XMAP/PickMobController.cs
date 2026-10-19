@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using NRO.Combat;
 
 namespace Game2.Mod.XMAP
 {
@@ -95,7 +96,7 @@ namespace Game2.Mod.XMAP
                 if (@char.mobFocus == null) @char.mobFocus = GetMobTanSat();
                 if (CanStartMassacreSkill(@char))
                 {
-                    Skill skillAttack = GetSkillAttack();
+                    Skill skillAttack = GetSkillAttack(mobTarget: true);
                     Mob target = @char.mobFocus;
                     bool needsTarget = skillAttack != null && !skillAttack.template.isBuffToPlayer() && !skillAttack.template.isUseAlone();
                     if (skillAttack != null && (!needsTarget || target != null))
@@ -164,7 +165,7 @@ namespace Game2.Mod.XMAP
 				}
 				if (CanStartMassacreSkill(@char))
 				{
-					Skill skillAttack2 = GetSkillAttack();
+					Skill skillAttack2 = GetSkillAttack(mobTarget: false);
 					bool needsTarget = skillAttack2 != null && !skillAttack2.template.isBuffToPlayer() && !skillAttack2.template.isUseAlone();
 					if (skillAttack2 != null && (!needsTarget || @char.charFocus != null))
 					{
@@ -421,7 +422,8 @@ namespace Game2.Mod.XMAP
 			{
 				return true;
 			}
-			return skill.template.id == 7 || skill.template.id == 10 || skill.template.id == 11 || skill.template.id == 14;
+			// Tri Thuong is a heal; offensive charged and self-use skills stay eligible.
+			return skill.template.id == 7;
 		}
 
 		private static int NextMassacreSkillCursor(int current, int count)
@@ -430,7 +432,7 @@ namespace Game2.Mod.XMAP
 			return (current + 1) % count;
 		}
 
-		private static Skill GetSkillAttack()
+		private static Skill GetSkillAttack(bool mobTarget)
 		{
 			Char player = Char.myCharz();
 			int count = player.vSkill.size();
@@ -440,7 +442,9 @@ namespace Game2.Mod.XMAP
 			{
 				int index = (start + offset) % count;
 				Skill skill = (Skill)player.vSkill.elementAt(index);
-				if (!IsExcludedMassacreSkill(skill) && skill.template.type >= 1 && skill.template.type <= 4 && CanUseSkill(skill))
+				if (!IsExcludedMassacreSkill(skill) && skill.template.type >= 1 && skill.template.type <= 4
+					&& (!mobTarget || MobAttackSkillCatalog.IsOffensiveMobSkill(skill.template.id)) && CanUseSkill(skill, mobTarget)
+					&& MobAttackResultTracker.CanAttemptFor(2, (byte)skill.template.id, mSystem.currentTimeMillis()))
 				{
 					return skill;
 				}
@@ -464,11 +468,15 @@ namespace Game2.Mod.XMAP
 
 		private static bool TryUseMassacreSkill(Skill skill, Mob targetMob, Char targetChar)
 		{
-			if (skill == null || IsExcludedMassacreSkill(skill) || !CanUseSkill(skill)) return false;
+			if (skill == null || IsExcludedMassacreSkill(skill) || !CanUseSkill(skill, targetMob != null)) return false;
+			if (targetMob != null && targetChar == null && !MobAttackSkillCatalog.IsOffensiveMobSkill(skill.template.id)) return false;
+			if (targetMob != null && targetChar == null
+				&& !MobAttackResultTracker.CanAttemptFor(2, (byte)skill.template.id, mSystem.currentTimeMillis())) return false;
 			Char player = Char.myCharz();
 			if (!skill.template.isBuffToPlayer() && !skill.template.isUseAlone() && targetMob == null && targetChar == null) return false;
 			if (!EnsurePositionSent() || !GameScr.gI().TrySelectSkillForAutoCombat(skill)) return false;
 			bool used;
+			long attackStartedAt = 0L;
 			if (skill.template.isBuffToPlayer())
 			{
 				MyVector targetPlayers = new MyVector();
@@ -477,8 +485,20 @@ namespace Game2.Mod.XMAP
 			}
 			else if (skill.template.isUseAlone())
 			{
-				player.useSkillNotFocus();
-				used = true;
+				if (targetMob != null && MobAttackSkillCatalog.IsOffensiveMobSkill(skill.template.id))
+				{
+					used = Service.gI().TrySendSelfMobSkill(skill, delegate(MobAttackResult result)
+					{
+						if (result.Status == MobAttackResultTracker.Accepted
+							|| skill.lastTimeUseThisSkill != attackStartedAt) return;
+						ModFunc.GI().SetUsedSkill(skill, result.RetryAfterMs);
+					});
+				}
+				else
+				{
+					player.useSkillNotFocus();
+					used = true;
+				}
 			}
 			else
 			{
@@ -486,12 +506,25 @@ namespace Game2.Mod.XMAP
 				MyVector targetPlayers = new MyVector();
 				if (targetMob != null) targetMobs.addElement(targetMob);
 				if (targetChar != null) targetPlayers.addElement(targetChar);
-				used = Service.gI().TrySendPlayerAttack(targetMobs, targetPlayers, (targetChar == null) ? 1 : 2);
+				if (targetMob != null && targetChar == null)
+				{
+					used = Service.gI().TrySendPlayerAttack(targetMobs, targetPlayers, 1, delegate(MobAttackResult result)
+					{
+						if (result.Status == MobAttackResultTracker.Accepted
+							|| skill.lastTimeUseThisSkill != attackStartedAt) return;
+						ModFunc.GI().SetUsedSkill(skill, result.Status == MobAttackResultTracker.OutOfRange ? 0 : result.RetryAfterMs);
+					});
+				}
+				else
+				{
+					used = Service.gI().TrySendPlayerAttack(targetMobs, targetPlayers, (targetChar == null) ? 1 : 2);
+				}
 			}
 			if (used)
 			{
 				AdvanceMassacreSkillCursor(skill);
 				ModFunc.GI().SetUsedSkill(skill);
+				attackStartedAt = skill.lastTimeUseThisSkill;
 			}
 			return used;
 		}
@@ -532,10 +565,11 @@ namespace Game2.Mod.XMAP
 			return skill.coolDown < SkillBetter.coolDown || flag;
 		}
 
-        private static bool CanUseSkill(Skill skill)
+        private static bool CanUseSkill(Skill skill, bool mobTarget = false)
         {
             if (skill == null || skill.template == null) return false;
-            if (mSystem.currentTimeMillis() - skill.lastTimeUseThisSkill <= (long)skill.coolDown + 25L) return false;
+            long cooldown = mobTarget ? System.Math.Max(0, skill.coolDown - 50L) : (long)skill.coolDown + 25L;
+            if (mSystem.currentTimeMillis() - skill.lastTimeUseThisSkill < cooldown) return false;
             Char player = Char.myCharz();
             if (skill.template.id == 9 && player.cHP <= player.cHPFull / 10) return false;
             skill.paintCanNotUseSkill = false;

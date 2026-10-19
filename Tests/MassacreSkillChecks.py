@@ -19,10 +19,11 @@ def extract_method(source: str, signature: str) -> str:
     return source[start:end]
 
 
-def run_csharp(methods: str, game: str) -> None:
+def run_csharp(methods: str, game: str, web_port: bool) -> None:
     harness = r"""
 using System;
 using System.Collections.Generic;
+using NRO.Combat;
 public static class Math { public static int abs(int value) { return System.Math.Abs(value); } }
 public class SkillInfoPaint { }
 public class SkillTemplate {
@@ -32,7 +33,29 @@ public class SkillTemplate {
     public bool isBuffToPlayer() { return type == 2; }
     public bool isUseAlone() { return type == 3; }
 }
-public class Skill { public SkillTemplate template; public bool ready = true; public int dx; public int dy; }
+public class Skill { public SkillTemplate template; public bool ready = true; public int dx; public int dy; public int coolDown; public long lastTimeUseThisSkill; }
+public static class mSystem { public static long currentTimeMillis() { return 10000; } }
+namespace NRO.Combat {
+    public static class MobAttackSkillCatalog {
+        public static bool IsOffensiveMobSkill(int id) {
+            return id == 0 || id == 1 || id == 2 || id == 3 || id == 4 || id == 5 || id == 9
+                || id == 10 || id == 11 || id == 14 || id == 17 || id == 20 || id == 24 || id == 25 || id == 26;
+        }
+    }
+    public static class MassacreAttackRange {
+        public static bool RequiresServerMeleeRange(int skillId) {
+            return skillId == 0 || skillId == 2 || skillId == 4 || skillId == 17;
+        }
+        public static bool IsWithinSkillRange(int skillId, long dx, long dy, int rangeX, int rangeY) {
+            if (dx < 0 || dy < 0 || dx > rangeX || dy > rangeY) return false;
+            return !RequiresServerMeleeRange(skillId) || dx * dx + dy * dy <= 80L * 80L;
+        }
+        public static int GetApproachOffset(int skillId, int rangeX) {
+            int desired = System.Math.Max(0, rangeX - 20);
+            return RequiresServerMeleeRange(skillId) ? System.Math.Min(80, desired) : desired;
+        }
+    }
+}
 public class MyVector {
     readonly List<object> values = new List<object>();
     public int size() { return values.Count; }
@@ -40,6 +63,11 @@ public class MyVector {
     public void addElement(object value) { values.Add(value); }
 }
 public class Mob { }
+public class MobAttackResult { public int Status; public int RetryAfterMs; }
+public static class MobAttackResultTracker {
+    public const int Accepted = 1, OutOfRange = 2;
+    public static bool CanAttemptFor(int lane, byte skillId, long now) { return true; }
+}
 public class Char {
     public MyVector vSkill = new MyVector();
     public int selfUses;
@@ -59,15 +87,27 @@ public class Service {
     public static Service instance = new Service();
     public MyVector mobs, chars;
     public int type;
+    public int selfMobUses;
     public static Service gI() { return instance; }
     public bool TrySendPlayerAttack(MyVector mobTargets, MyVector charTargets, int attackType) {
         mobs = mobTargets; chars = charTargets; type = attackType; return true;
+    }
+    public bool TrySendPlayerAttack(MyVector mobTargets, MyVector charTargets, int attackType, Action<MobAttackResult> callback) {
+        bool sent = TrySendPlayerAttack(mobTargets, charTargets, attackType);
+        if (sent && callback != null) callback(new MobAttackResult { Status = MobAttackResultTracker.Accepted });
+        return sent;
+    }
+    public bool TrySendSelfMobSkill(Skill skill, Action<MobAttackResult> callback) {
+        selfMobUses++;
+        if (callback != null) callback(new MobAttackResult { Status = MobAttackResultTracker.Accepted });
+        return true;
     }
 }
 public class ModFunc {
     public static ModFunc instance = new ModFunc();
     public static ModFunc GI() { return instance; }
     public void SetUsedSkill(Skill skill) { }
+    public void SetUsedSkill(Skill skill, int retryAfterMs) { }
 }
 namespace Game1.Mod.XMAP {
 public static class PickMob {
@@ -85,16 +125,19 @@ public class PickMobController {
     private static int massacreSkillCursor;
     METHODS
     private static bool CanUseSkill(Skill skill) { return skill != null && skill.ready; }
+    private static bool CanUseSkill(Skill skill, bool mobTarget) { return CanUseSkill(skill); }
+    private static Skill GetSkillAttack() { return GetSkillAttack(true); }
     private static bool EnsurePositionSent() { return true; }
-    public static void Run() {
-        foreach (sbyte id in new sbyte[] { 7, 10, 11, 14 })
+    public static void Run(bool webPort) {
+        foreach (sbyte id in (webPort ? new sbyte[] { 7 } : new sbyte[] { 7, 10, 11, 14 }))
             if (!IsExcludedMassacreSkill(new Skill { template = new SkillTemplate { id = id } }))
                 throw new Exception("forbidden skill ID was selected: " + id);
-        if (IsExcludedMassacreSkill(new Skill { template = new SkillTemplate { id = 23 } }))
-            throw new Exception("an unlisted skill was excluded");
+        foreach (sbyte id in (webPort ? new sbyte[] { 10, 11, 14, 23 } : new sbyte[] { 23 }))
+            if (IsExcludedMassacreSkill(new Skill { template = new SkillTemplate { id = id } }))
+                throw new Exception("an eligible skill was excluded: " + id);
         if (NextMassacreSkillCursor(0, 3) != 1 || NextMassacreSkillCursor(2, 3) != 0)
             throw new Exception("skill cursor did not rotate");
-        Skill shortRange = new Skill { dx = 40, dy = 25 };
+        Skill shortRange = new Skill { template = new SkillTemplate { id = 0 }, dx = 40, dy = 25 };
         if (!IsWithinMassacreSkillRange(shortRange, 135, 210, 100, 200))
             throw new Exception("valid short-range target was rejected");
         if (IsWithinMassacreSkillRange(shortRange, 141, 210, 100, 200))
@@ -106,27 +149,33 @@ public class PickMobController {
             throw new Exception("approach point did not preserve the skill's attack spacing");
         Char.instance.animation = new SkillInfoPaint[] { new SkillInfoPaint(), new SkillInfoPaint() };
         Char.instance.indexSkill = 0;
-        if (CanStartMassacreSkill(Char.instance))
-            throw new Exception("controller overlapped a skill before the hidden pose finished");
-        Char.instance.indexSkill = 2;
-        if (!CanStartMassacreSkill(Char.instance))
-            throw new Exception("completed hidden pose kept the controller blocked");
+        if (webPort) {
+            if (CanStartMassacreSkill(Char.instance))
+                throw new Exception("web controller overlapped a skill before the hidden pose finished");
+            Char.instance.indexSkill = 2;
+            if (!CanStartMassacreSkill(Char.instance))
+                throw new Exception("completed hidden pose kept the web controller blocked");
+        } else if (!CanStartMassacreSkill(Char.instance)) {
+            throw new Exception("native controller blocked skill selection");
+        }
         Char.instance = new Char();
         Char.instance.vSkill.addElement(new Skill { template = new SkillTemplate { id = 0, type = 1 } });
-        foreach (sbyte blocked in new sbyte[] { 7, 10, 11, 14 })
+        foreach (sbyte blocked in (webPort ? new sbyte[] { 7 } : new sbyte[] { 7, 10, 11, 14 }))
             Char.instance.vSkill.addElement(new Skill { template = new SkillTemplate { id = blocked, type = 1 } });
+        if (webPort) foreach (sbyte offensive in new sbyte[] { 10, 11, 14 })
+            Char.instance.vSkill.addElement(new Skill { template = new SkillTemplate { id = offensive, type = 1 } });
         Char.instance.vSkill.addElement(new Skill { template = new SkillTemplate { id = 23, type = 1 } });
         Char.instance.vSkill.addElement(new Skill { template = new SkillTemplate { id = 19, type = 2 } });
         Char.instance.vSkill.addElement(new Skill { template = new SkillTemplate { id = 6, type = 3 } });
         Char.instance.vSkill.addElement(new Skill { template = new SkillTemplate { id = 24, type = 4 } });
         massacreSkillCursor = 0;
-        sbyte[] expectedOrder = new sbyte[] { 0, 23, 19, 6, 24 };
+        sbyte[] expectedOrder = webPort ? new sbyte[] { 0, 10, 11, 14, 24 } : new sbyte[] { 0, 23, 19, 6, 24 };
         if (GetSkillAttack().template.id != 0 || GetSkillAttack().template.id != 0)
             throw new Exception("skill cursor advanced before a skill was successfully used");
         foreach (sbyte expected in expectedOrder) {
             Skill selected = GetSkillAttack();
             if (selected == null || selected.template.id != expected)
-                throw new Exception("learned skills were not selected fairly; expected " + expected);
+                throw new Exception("learned skills were not selected fairly; expected " + expected + " got " + (selected == null ? -1 : selected.template.id));
             AdvanceMassacreSkillCursor(selected);
         }
         Skill buff = new Skill { template = new SkillTemplate { id = 19, type = 2 } };
@@ -137,6 +186,9 @@ public class PickMobController {
         if (!TryUseMassacreSkill(self, null, null) || Char.instance.selfUses != 1)
             throw new Exception("self-use skill was not activated without a target");
         Mob targetMob = new Mob();
+        if (webPort && (!TryUseMassacreSkill(new Skill { template = new SkillTemplate { id = 14, type = 3 } }, targetMob, null)
+            || Service.instance.selfMobUses != 1))
+            throw new Exception("self-centered mob damage was not sent through confirmed cast tracking");
         if (!TryUseMassacreSkill(new Skill { template = new SkillTemplate { id = 0, type = 1 } }, targetMob, null)
             || Service.instance.mobs.size() != 1 || !Object.ReferenceEquals(Service.instance.mobs.elementAt(0), targetMob))
             throw new Exception("attack skill was not sent to the selected mob");
@@ -162,7 +214,7 @@ public class PickMobController {
     with tempfile.TemporaryDirectory() as directory:
         cs = Path(directory) / "MassacreSkillChecks.cs"
         cs.write_text(harness, encoding="utf-8-sig")
-        command = "Add-Type -Path '" + str(cs).replace("'", "''") + "'; [PickMobController]::Run()"
+        command = "$ErrorActionPreference='Stop'; Add-Type -Path '" + str(cs).replace("'", "''") + "'; try { [PickMobController]::Run($" + str(web_port).lower() + ") } catch { [Console]::Error.WriteLine($_.Exception.ToString()); exit 1 }"
         result = subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
             capture_output=True,
@@ -191,7 +243,7 @@ class MassacreSkillChecks(unittest.TestCase):
                             "private static bool CanStartMassacreSkill(Char player)",
                             "private static bool IsWithinMassacreSkillRange(Skill skill, int targetX, int targetY, int playerX, int playerY)",
                             "private static int GetMassacreApproachX(Skill skill, int targetX, int playerX)",
-                            "private static Skill GetSkillAttack()",
+                            "private static Skill GetSkillAttack(bool mobTarget)",
                             "private static void AdvanceMassacreSkillCursor(Skill usedSkill)",
                             "private static bool TryUseMassacreSkill(Skill skill, Mob targetMob, Char targetChar)",
                         )
@@ -210,11 +262,12 @@ class MassacreSkillChecks(unittest.TestCase):
                         skill_paint.index("if (ShouldSuppressOwnSkillAnimation(me))"),
                         skill_paint.index("cf = array[indexSkill].status;"),
                     )
-                    self.assertIn("indexSkill = array.Length;", skill_paint)
+                    if root == WEB:
+                        self.assertIn("indexSkill = array.Length;", skill_paint)
                     game_scr = (source_root / "GameScr.cs").read_text(encoding="utf-8-sig")
                     self.assertIn("Char.myCharz().paintCharWithSkill(g);", game_scr)
                     self.assertIn("paintSelectedSkill(g);", game_scr)
-                    run_csharp(methods, game)
+                    run_csharp(methods, game, root == WEB)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ using Game2.Assets.src.f;
 using Game2.Assets.src.g;
 using Game2.Mod.XMAP;
 using UnityEngine;
+using NRO.Combat;
 
 namespace Game2
 {
@@ -39,20 +40,20 @@ namespace Game2
 		public void onConnectOK(bool isMain1)
 		{
 			isMain = isMain1;
-            if(isMain1) BossNoticeBoard.Reset();
+            if(isMain1) BossNoticeBoard.Reconnected();
 			mSystem.onConnectOK();
 		}
 
 		public void onConnectionFail(bool isMain1)
 		{
-            if (isMain1) { AutoItem.Clear(); BossNoticeBoard.Reset(); }
+			if (isMain1) { AutoItem.Clear(); BossNoticeBoard.TransportDisconnected(); MobAttackResultTracker.ClearFor(2); }
 			isMain = isMain1;
 			mSystem.onConnectionFail();
 		}
 
 		public void onDisconnected(bool isMain1)
 		{
-            if (isMain1) { AutoItem.Clear(); BossNoticeBoard.Reset(); }
+			if (isMain1) { AutoItem.Clear(); BossNoticeBoard.TransportDisconnected(); MobAttackResultTracker.ClearFor(2); }
 			isMain = isMain1;
 			if (isMain1) Char.myCharz().stopUseChargeSkill();
 			mSystem.onDisconnected();
@@ -2682,7 +2683,6 @@ namespace Game2
 					GameCanvas.endDlg();
 					TileMap.vGo.removeAllElements();
 					PopUp.vPopups.removeAllElements();
-					mSystem.gcc();
 					TileMap.mapID = msg.reader().readUnsignedByte();
 					TileMap.planetID = msg.reader().readByte();
 					TileMap.tileID = msg.reader().readByte();
@@ -3360,6 +3360,36 @@ namespace Game2
 				case -58:
                     BossNoticeBoard.Receive(msg);
                     break;
+				case -48:
+				{
+					MobAttackResult result = new MobAttackResult();
+					result.Sequence = msg.reader().readInt();
+					result.Status = unchecked((byte)msg.reader().readByte());
+					result.PlayerX = msg.reader().readShort();
+					result.PlayerY = msg.reader().readShort();
+					result.MobId = (byte)msg.reader().readUnsignedByte();
+					result.MobX = msg.reader().readShort();
+					result.MobY = msg.reader().readShort();
+					result.RetryAfterMs = msg.reader().readInt();
+					MobAttackTrace.RecordResult(2, result);
+					ClientWebCombatDiagnostics.RecordResult(2, result);
+					if (!MobAttackResultTracker.ResolveFor(2, result, mSystem.currentTimeMillis())) break;
+					if (result.Status == MobAttackResultTracker.OutOfRange)
+					{
+						Char player = Char.myCharz();
+						player.cx = result.PlayerX;
+						player.cy = result.PlayerY;
+						player.cxSend = player.cx;
+						player.cySend = player.cy;
+						Mob mob = GameScr.findMobInMap(result.MobId);
+						if (mob != null && result.MobX >= 0 && result.MobY >= 0)
+						{
+							mob.x = mob.xFirst = result.MobX;
+							mob.y = mob.yFirst = result.MobY;
+						}
+					}
+					break;
+				}
 				case 50:
 				{
 					sbyte b37 = msg.reader().readByte();
@@ -3903,7 +3933,7 @@ namespace Game2
 					catch (Exception)
 					{
 					}
-					if (mob12 == null || mob12.status == 0 || mob12.status == 0)
+					if (mob12 == null || mob12.status == 1)
 					{
 						break;
 					}
@@ -3911,6 +3941,7 @@ namespace Game2
 					try
 					{
 						long num196 = msg.readLong();
+						ClientWebCombatDiagnostics.RecordMobKill(2, mob12.mobId, num196);
 						if (msg.reader().readBool())
 						{
 							GameScr.startFlyText("-" + num196, mob12.x, mob12.y - mob12.h, 0, -2, mFont.FATAL);
@@ -4027,39 +4058,38 @@ namespace Game2
 					mob14.hp = msg.readLong();
 					mob14.updateHp_bar();
 					long num204 = msg.readLong();
-					if (num204 != 1)
+					MobAttackTrace.RecordHit(2, mob14.mobId, mob14.hp, num204);
+					ClientWebCombatDiagnostics.RecordHit(2, mob14.mobId, mob14.hp, num204);
+					if (num204 > 0)
 					{
-						if (num204 > 1)
-						{
-							mob14.setInjure();
-						}
-						bool flag7 = false;
-						try
-						{
-							flag7 = msg.reader().readBoolean();
-						}
-						catch (Exception)
-						{
-						}
-						sbyte b52 = msg.reader().readByte();
-						if (b52 != -1)
-						{
-							EffecMn.addEff(new Effect(b52, mob14.x, mob14.getY(), 3, 1, -1));
-						}
-						if (flag7)
-						{
-							GameScr.startFlyText("-" + num204, mob14.x, mob14.getY() - mob14.getH(), 0, -2, mFont.FATAL);
-						}
-						else if (num204 == 0L)
-						{
-							mob14.x = mob14.xFirst;
-							mob14.y = mob14.yFirst;
-							GameScr.startFlyText(mResources.miss, mob14.x, mob14.getY() - mob14.getH(), 0, -2, mFont.MISS);
-						}
-						else if (num204 > 1)
-						{
-							GameScr.startFlyText("-" + num204, mob14.x, mob14.getY() - mob14.getH(), 0, -2, mFont.ORANGE);
-						}
+						mob14.setInjure();
+					}
+					bool flag7 = false;
+					try
+					{
+						flag7 = msg.reader().readBoolean();
+					}
+					catch (Exception)
+					{
+					}
+					sbyte b52 = msg.reader().readByte();
+					if (b52 != -1)
+					{
+						EffecMn.addEff(new Effect(b52, mob14.x, mob14.getY(), 3, 1, -1));
+					}
+					if (flag7)
+					{
+						GameScr.startFlyText("-" + num204, mob14.x, mob14.getY() - mob14.getH(), 0, -2, mFont.FATAL);
+					}
+					else if (num204 == 0L)
+					{
+						mob14.x = mob14.xFirst;
+						mob14.y = mob14.yFirst;
+						GameScr.startFlyText(mResources.miss, mob14.x, mob14.getY() - mob14.getH(), 0, -2, mFont.MISS);
+					}
+					else if (num204 > 0)
+					{
+						GameScr.startFlyText("-" + num204, mob14.x, mob14.getY() - mob14.getH(), 0, -2, mFont.ORANGE);
 					}
 					break;
 				}
@@ -4739,8 +4769,6 @@ namespace Game2
 						_ = waypoint.minX;
 					}
 				}
-				Resources.UnloadUnusedAssets();
-				GC.Collect();
 				num = msg.reader().readByte();
 				Mob.newMob.removeAllElements();
 				for (sbyte b = 0; b < num; b = (sbyte)(b + 1))
@@ -5014,8 +5042,6 @@ namespace Game2
 				sbyte teleport = msg.reader().readByte();
 				loadCurrMap(teleport);
 				Char.isLoadingMap = false;
-				Resources.UnloadUnusedAssets();
-				GC.Collect();
 				ModFunc.GI().canUpdate = true;
 			}
 			catch (Exception)
@@ -5277,7 +5303,6 @@ namespace Game2
 						GameCanvas.isLoading = true;
 						TileMap.maps = null;
 						TileMap.types = null;
-						mSystem.gcc();
 						GameCanvas.debug("SA99", 2);
 						TileMap.tmw = msg.reader().readByte();
 						TileMap.tmh = msg.reader().readByte();

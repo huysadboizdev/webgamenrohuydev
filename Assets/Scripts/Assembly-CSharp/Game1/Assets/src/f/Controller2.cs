@@ -993,6 +993,7 @@ namespace Game1.Assets.src.f
 					Char char2 = null;
 					if (num9 == Char.myCharz().charID)
 					{
+						NRO.Combat.ClientWebCombatDiagnostics.RecordTeleportConfirm(1, xPos, yPos, b5);
 						char2 = Char.myCharz();
 					}
 					else if (GameScr.findCharInMap(num9) != null)

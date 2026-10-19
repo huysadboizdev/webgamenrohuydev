@@ -7,10 +7,53 @@ const {WebSocketServer, WebSocket} = require('ws');
 
 function createGateway(options = {}) {
   const root = path.resolve(options.root || path.join(__dirname,'../Builds/WebGL'));
+  const diagnosticsRoot = path.resolve(options.diagnosticsRoot || path.join(root,'..','Logs'));
   const allowed = new Set(options.targets || ['127.0.0.1:14445']);
-  const maxBuffer = 8 * 1024 * 1024;
+  const maxBuffer = 8 * 1024 * 1024, maxDiagnosticBody = 64 * 1024;
   const mime = {'.html':'text/html; charset=utf-8','.js':'application/javascript','.wasm':'application/wasm','.data':'application/octet-stream','.json':'application/json','.png':'image/png','.css':'text/css'};
   const server = http.createServer((req,res) => {
+    let requestPath;
+    try { requestPath = new URL(req.url,'http://local').pathname; } catch { res.writeHead(400);res.end();return; }
+    if (req.method === 'POST' && requestPath === '/diagnostics') {
+      const origin = req.headers.origin;
+      const protocol = req.socket.encrypted ? 'https:' : 'http:';
+      let sameOrigin = false;
+      try { const parsed = new URL(origin); sameOrigin = parsed.origin === protocol + '//' + req.headers.host; } catch {}
+      if (!sameOrigin && !(options.origins || []).includes(origin)) { res.writeHead(403);res.end('Origin rejected.');return; }
+      if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) { res.writeHead(415);res.end('JSON required.');return; }
+      let body = '', tooLarge = false;
+      req.on('data', chunk => {
+        if (tooLarge) return;
+        body += chunk.toString('utf8');
+        if (Buffer.byteLength(body) > maxDiagnosticBody) { tooLarge = true;res.writeHead(413);res.end('Log batch too large.');req.destroy(); }
+      });
+      req.on('end', async () => {
+        if (tooLarge || res.writableEnded) return;
+        let payload;
+        try {
+          payload = JSON.parse(body);
+        } catch {
+          res.writeHead(400);res.end('Invalid log batch.');return;
+        }
+        if (!payload || typeof payload.sessionId !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(payload.sessionId)
+            || !Array.isArray(payload.lines) || payload.lines.length < 1 || payload.lines.length > 100
+            || payload.lines.some(line => typeof line !== 'string' || line.length > 512 || /[\r\n]/.test(line))) {
+          res.writeHead(400);res.end('Invalid log batch.');return;
+        }
+        try {
+          await fs.promises.mkdir(diagnosticsRoot,{recursive:true});
+          const file = path.join(diagnosticsRoot,'combat-'+payload.sessionId+'.ndjson');
+          const receivedAt = new Date().toISOString();
+          const records = payload.lines.map(event => JSON.stringify({receivedAt,sessionId:payload.sessionId,event})).join('\n')+'\n';
+          await fs.promises.appendFile(file,records,'utf8');
+          res.writeHead(204);res.end();
+        } catch (error) {
+          console.error('Combat log write failed:',error.message);
+          res.writeHead(500);res.end('Combat log could not be saved.');
+        }
+      });
+      return;
+    }
     if (req.method !== 'GET' && req.method !== 'HEAD') {res.writeHead(405);res.end();return;}
     let pathname;
     try {pathname = decodeURIComponent(new URL(req.url,'http://local').pathname);} catch {res.writeHead(400);res.end();return;}
